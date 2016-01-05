@@ -1,7 +1,7 @@
 # pylint: skip-file
 import mxnet as mx
 import numpy as np
-import os, sys
+import os
 import pickle as pickle
 import logging
 from common import get_data

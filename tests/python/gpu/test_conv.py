@@ -45,7 +45,7 @@ def get_iter(data_dir):
 logging.basicConfig(level=logging.DEBUG)
 
 num_gpus = 1
-data_dir = 's3://dmcl/mnist'
+data_dir = 'data'
 
 (train, val) = get_iter(data_dir)
 
