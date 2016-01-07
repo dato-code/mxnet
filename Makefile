@@ -28,8 +28,13 @@ else
 	CFLAGS += -O3
 endif
 
-ifeq ($(WITH_FPIC), 1)
+ifneq ($(WIN32), 1)
 	CFLAGS += -fPIC
+	SHARED_LIB_EXT = so
+	STATIC_LIB_EXT = a
+else
+	SHARED_LIB_EXT = dll
+	STATIC_LIB_EXT = lib
 endif
 CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
@@ -146,17 +151,17 @@ $(EXTRA_OPERATORS)/build/%_gpu.o: $(EXTRA_OPERATORS)/%.cu
 	$(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" -M -MT $(EXTRA_OPERATORS)/build/$*_gpu.o $< >$(EXTRA_OPERATORS)/build/$*_gpu.d
 	$(NVCC) -c -o $@ $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" $<
 
-lib/libmxnet.a: $(ALL_DEP)
-	@mkdir -p $(@D)
-	ar crv $@ $(filter %.o, $?)
-
 copy_cuda_deps:
 ifdef CUDA_DEP
 	@mkdir -p lib
 	cp $(CUDA_DEP) lib
 endif
 
-lib/libmxnet.so: $(ALL_DEP) copy_cuda_deps
+lib/libmxnet.$(STATIC_LIB_EXT): $(ALL_DEP)
+	@mkdir -p $(@D)
+	ar crv $@ $(filter %.o, $?)
+
+lib/libmxnet.$(SHARED_LIB_EXT): $(ALL_DEP) copy_cuda_deps
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -shared -o $@ $(filter %.o %.a, $^) $(LDFLAGS)
 

@@ -26,7 +26,7 @@ export NVCC = ${NVCC}
 
 # whether compile with debug
 DEBUG = 0
-WITH_FPIC = ${WITH_FPIC}
+WIN32 = ${WIN32}
 
 # the additional link flags you want to add
 ADD_LDFLAGS = ${ADD_LDFLAGS}
