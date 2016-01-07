@@ -98,7 +98,7 @@ endif
 
 .PHONY: clean all test lint doc clean_all rcpplint rcppexport roxygen
 
-all: lib/libmxnet.a lib/libmxnet.so $(BIN)
+all: lib/libmxnet.$(STATIC_LIB_EXT) lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
 
 SRC = $(wildcard src/*.cc src/*/*.cc)
 OBJ = $(patsubst src/%.cc, build/%.o, $(SRC))
