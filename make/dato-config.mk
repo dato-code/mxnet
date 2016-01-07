@@ -28,9 +28,11 @@ export NVCC = ${NVCC}
 DEBUG = 0
 
 # the additional link flags you want to add
-ADD_LDFLAGS = -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
+ADD_LDFLAGS = ${ADD_LDFLAGS}
+ADD_LDFLAGS += -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
 
 # the additional compile flags you want to add
+ADD_CFLAGS = ${ADD_CFLAGS}
 ADD_CFLAGS = -I${DEPS}/include
 
 #---------------------------------------------
