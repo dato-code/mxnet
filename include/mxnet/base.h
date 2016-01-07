@@ -52,7 +52,7 @@
 /*!
  * \brief define dllexport for Visual Studio
  */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(_WIN32) 
 #ifdef MXNET_EXPORTS
 #define MXNET_API __declspec(dllexport)
 #else

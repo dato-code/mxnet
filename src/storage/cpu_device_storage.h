@@ -38,7 +38,7 @@ class CPUDeviceStorage {
 };  // class CPUDeviceStorage
 
 inline void* CPUDeviceStorage::Alloc(size_t size) {
-#if _MSC_VER
+#if defined(_MSC_VER) || defined(_WIN32)
   void* ptr;
   ptr = _aligned_malloc(size, alignment_);
   return CHECK_NOTNULL(ptr);
@@ -51,7 +51,7 @@ inline void* CPUDeviceStorage::Alloc(size_t size) {
 }
 
 inline void CPUDeviceStorage::Free(void* ptr) {
-#if _MSC_VER
+#if defined(_MSC_VER) || defined(_WIN32)
   _aligned_free(ptr);
 #else
   free(ptr);

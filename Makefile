@@ -12,15 +12,10 @@ ifndef DMLC_CORE
 	DMLC_CORE = dmlc-core
 endif
 
-ifneq ($(USE_OPENMP), 1)
-	export NO_OPENMP = 1
-endif
-
 # use customized config file
 include $(config)
 include mshadow/make/mshadow.mk
 include $(DMLC_CORE)/make/dmlc.mk
-unexport NO_OPENMP
 
 # all the possible warning tread
 WARNFLAGS= -Wall

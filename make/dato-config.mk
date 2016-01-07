@@ -58,6 +58,11 @@ USE_OPENCV = 0
 
 # use openmp for parallelization
 USE_OPENMP = ${USE_OPENMP}
+ifneq ($(USE_OPENMP), 1)
+	export NO_OPENMP = 1
+	ADD_CFLAGS += -DDISABLE_OPENMP
+endif
+
 
 # choose the version of blas you want to use
 # can be: mkl, blas, atlas, openblas

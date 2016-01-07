@@ -52,7 +52,7 @@ class ObjectPool {
    * \brief Internal structure to hold pointers.
    */
   struct LinkedList {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(_WIN32)
     T t;
     LinkedList* next{nullptr};
 #else
@@ -168,7 +168,7 @@ void ObjectPool<T>::AllocateChunk() {
   static_assert(alignof(LinkedList) % alignof(T) == 0, "ObjectPooll Invariant");
   static_assert(kPageSize % alignof(LinkedList) == 0, "ObjectPooll Invariant");
   void* new_chunk_ptr;
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(_WIN32)
   new_chunk_ptr = _aligned_malloc(kPageSize, kPageSize);
   CHECK_NE(new_chunk_ptr, NULL) << "Allocation failed";
 #else
