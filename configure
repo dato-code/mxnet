@@ -254,7 +254,7 @@ elif [[ $OSTYPE == msys ]]; then
         USE_OPENMP=0
         WITH_FPIC=0
         USE_BLAS="openblas"
-        ADD_CFLAGS="-DMXNET_EXPORTS"
+        ADD_CFLAGS="-DMXNET_EXPORTS "
         SHARED_LINKER_FLAGS="-Wl,-rpath,/mingw64/bin -Wl,-rpath,${PWD}/deps/local/lib64 -Wl,-rpath,${PWD}/deps/local/lib"
 fi
 
