@@ -21,6 +21,7 @@
 *.la
 *.a
 *.lib
+lib/*
 
 # Executables
 *.exe
@@ -90,4 +91,8 @@ input.txt*
 .idea
 
 # ctags
+<<<<<<< HEAD
 tags
+
+
+miniconda.sh
