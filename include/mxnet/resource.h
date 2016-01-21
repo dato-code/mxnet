@@ -115,6 +115,11 @@ class ResourceManager {
    * \return Resource manager singleton.
    */
   static ResourceManager *Get();
+
+  /**
+   * Destroy the Resource manager singleton.
+   */
+  static void Shutdown();
 };
 }  // namespace mxnet
 #endif  // MXNET_RESOURCE_H_

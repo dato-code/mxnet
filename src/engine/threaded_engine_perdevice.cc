@@ -38,9 +38,10 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
     // create CPU task
     int cpu_priority_nthreads = dmlc::GetEnv("MXNET_CPU_PRIORITY_NTHREADS", 4);
     cpu_priority_worker_.reset(new ThreadWorkerBlock<kPriorityQueue>());
+    auto blockptr = cpu_priority_worker_.get();
     cpu_priority_worker_->pool.reset(new ThreadPool(
-        cpu_priority_nthreads, [this] {
-          this->CPUWorker(cpu_priority_worker_.get());
+        cpu_priority_nthreads, [this, blockptr] {
+          this->CPUWorker(blockptr);
         }));
     // GPU tasks will be created lazily
   }

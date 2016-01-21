@@ -180,9 +180,15 @@ class MXNET_API Engine {
    *  This function is called by another singleton X who requires
    *  engine to be destructed after X.
    *
-   * \return A shared pointer to Engine singleton.
+   * \return A ref of the shared pointer to Engine singleton.
    */
-  static std::shared_ptr<Engine> _GetSharedRef();
+  static std::shared_ptr<Engine>& _GetSharedRef();
+
+  /**
+   * \brief Destroy the global engine singleton. Future
+   * access to engine is disabled.
+   */
+  static void Shutdown();
   /*!
    * \brief Push an synchronous operation to the engine.
    * \param exec_fn Execution function that executes the operation.
