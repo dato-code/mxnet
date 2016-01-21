@@ -261,10 +261,13 @@ GraphExecutor::GetOpExecEntry(uint32_t nid) {
 }
 
 GraphExecutor::~GraphExecutor() {
-  Engine::Get()->WaitForAll();
-  // need to delete the operators before delete the NDArray they referenced.
-  for (OpNode& node : op_nodes_) {
-    node.DeleteOperator();
+  auto engine_ptr = Engine::Get();
+  if (engine_ptr) { 
+    engine_ptr->WaitForAll();
+    // need to delete the operators before delete the NDArray they referenced.
+    for (OpNode& node : op_nodes_) {
+      node.DeleteOperator();
+    }
   }
 }
 
