@@ -39,13 +39,28 @@ inline Engine* CreateEngine() {
 }
 }  // namespace engine
 
-std::shared_ptr<Engine> Engine::_GetSharedRef() {
+
+static bool engine_shutdown = false;
+
+std::shared_ptr<Engine>& Engine::_GetSharedRef() {
+  if (engine_shutdown) LOG(FATAL) << "Call GetRef() after engine already shutdown" << std::endl;
   static std::shared_ptr<Engine> sptr(engine::CreateEngine());
   return sptr;
 }
 
 Engine* Engine::Get() {
+  if (engine_shutdown) {
+    return nullptr;
+  }
   static Engine *inst = _GetSharedRef().get();
   return inst;
 }
+
+void Engine::Shutdown() {
+  if (!engine_shutdown) {
+    _GetSharedRef().reset();
+    engine_shutdown = true;
+  }
+}
+
 }  // namespace mxnet

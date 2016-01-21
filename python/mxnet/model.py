@@ -80,7 +80,6 @@ def _initialize_kvstore(kvstore, param_arrays, arg_params, param_names,
     for idx in range(len(param_arrays)):
         param_on_devs = param_arrays[idx]
         kvstore.init(idx, arg_params[param_names[idx]])
-
         if update_on_kvstore:
             kvstore.pull(idx, param_on_devs, priority=-idx)
 
@@ -202,7 +201,6 @@ def _train_multi_device(symbol, ctx, arg_names, param_names, aux_names,
 
     if update_on_kvstore:
         kvstore.set_optimizer(optimizer)
-
     # Now start training
     for epoch in range(begin_epoch, end_epoch):
         # Training phase
@@ -416,6 +414,9 @@ class FeedForward(BASE_ESTIMATOR):
             ctx = [cpu()]
         elif isinstance(ctx, Context):
             ctx = [ctx]
+        # disable multi-cpu data parallelism because blas will use all cpu resource
+        if ctx[0].device_type == "cpu" and len(ctx) > 1:
+            ctx = [cpu()]
         self.ctx = ctx
         # training parameters
         self.num_epoch = num_epoch
