@@ -43,13 +43,15 @@ inline Engine* CreateEngine() {
 static bool engine_shutdown = false;
 
 std::shared_ptr<Engine>& Engine::_GetSharedRef() {
-  if (engine_shutdown) LOG(FATAL) << "Engine already shutdone" << std::endl;
+  if (engine_shutdown) LOG(FATAL) << "Call GetRef() after engine already shutdown" << std::endl;
   static std::shared_ptr<Engine> sptr(engine::CreateEngine());
   return sptr;
 }
 
 Engine* Engine::Get() {
-  if (engine_shutdown) LOG(FATAL) << "Engine already shutdone" << std::endl;
+  if (engine_shutdown) {
+    return nullptr;
+  }
   static Engine *inst = _GetSharedRef().get();
   return inst;
 }

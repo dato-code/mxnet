@@ -171,7 +171,9 @@ class MXNET_API Engine {
   /*!\brief virtual destructor */
   virtual ~Engine() noexcept(false) {}
   /*!
-   * \return Engine singleton.
+   * \return Engine singleton. NULL if Shutdown() is called.
+   *
+   * \note Check nullptr if used in destructors.
    */
   static Engine* Get();
   /*!
