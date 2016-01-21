@@ -58,6 +58,7 @@ Engine* Engine::Get() {
 
 void Engine::Shutdown() {
   if (!engine_shutdown) {
+    Engine::Get()->WaitForAll();
     _GetSharedRef().reset();
     engine_shutdown = true;
   }
