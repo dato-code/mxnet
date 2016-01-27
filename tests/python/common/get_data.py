@@ -15,14 +15,14 @@ def download_file(url, target_file):
 # download mnist.pkl.gz
 def GetMNIST_pkl():
     if not os.path.isdir("data/"):
-        os.system("mkdir data/")
+        os.mkdir("data")
     if not os.path.exists('data/mnist.pkl.gz'):
         download_file("http://deeplearning.net/data/mnist/mnist.pkl.gz", "data/mnist.pkl.gz")
 
 # download ubyte version of mnist and untar
 def GetMNIST_ubyte():
     if not os.path.isdir("data/"):
-        os.system("mkdir data/")
+        os.mkdir("data")
     if (not os.path.exists('data/train-images-idx3-ubyte')) or \
        (not os.path.exists('data/train-labels-idx1-ubyte')) or \
        (not os.path.exists('data/t10k-images-idx3-ubyte')) or \
@@ -36,7 +36,7 @@ def GetMNIST_ubyte():
 # download cifar
 def GetCifar10():
     if not os.path.isdir("data/"):
-        os.system("mkdir data/")
+        os.mkdir("data")
     if not os.path.exists('data/cifar10.zip'):
         download_file("http://webdocs.cs.ualberta.ca/~bx3/data/cifar10.zip", "data/cfar10.zip")
         os.chdir("./data")

@@ -323,13 +323,18 @@ class NDArray {
     }
     /*! \brief destructor */
     ~Chunk() {
+      auto engine_ptr = Engine::Get();
       if (static_data || delay_alloc) {
-        Engine::Get()->DeleteVariable([](RunContext s) {}, shandle.ctx, var);
+        if (engine_ptr) {
+          engine_ptr->DeleteVariable([](RunContext s) {}, shandle.ctx, var);
+        }
       } else {
         Storage::Handle h = this->shandle;
-        Engine::Get()->DeleteVariable([h](RunContext s) {
-            Storage::Get()->Free(h);
-          }, shandle.ctx, var);
+        if (engine_ptr) {
+          Engine::Get()->DeleteVariable([h](RunContext s) {
+              Storage::Get()->Free(h);
+            }, shandle.ctx, var);
+        }
       }
     }
   };

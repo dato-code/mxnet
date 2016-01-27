@@ -12,15 +12,10 @@ ifndef DMLC_CORE
 	DMLC_CORE = dmlc-core
 endif
 
-ifneq ($(USE_OPENMP), 1)
-	export NO_OPENMP = 1
-endif
-
 # use customized config file
 include $(config)
 include mshadow/make/mshadow.mk
 include $(DMLC_CORE)/make/dmlc.mk
-unexport NO_OPENMP
 
 # all the possible warning tread
 WARNFLAGS= -Wall
@@ -32,7 +27,16 @@ ifeq ($(DEBUG), 1)
 else
 	CFLAGS += -O3
 endif
-CFLAGS += -I./mshadow/ -I./dmlc-core/include -fPIC -Iinclude $(MSHADOW_CFLAGS)
+
+ifneq ($(WIN32), 1)
+	CFLAGS += -fPIC
+	SHARED_LIB_EXT = so
+	STATIC_LIB_EXT = a
+else
+	SHARED_LIB_EXT = dll
+	STATIC_LIB_EXT = lib
+endif
+CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
 ifeq ($(DEBUG), 1)
 	NVCCFLAGS = -g -G -O0 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
@@ -96,7 +100,7 @@ include $(MXNET_PLUGINS)
 
 .PHONY: clean all test lint doc clean_all rcpplint rcppexport roxygen
 
-all: lib/libmxnet.a lib/libmxnet.so $(BIN)
+all: lib/libmxnet.$(STATIC_LIB_EXT) lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
 
 SRC = $(wildcard src/*.cc src/*/*.cc)
 OBJ = $(patsubst %.cc, build/%.o, $(SRC))
@@ -177,19 +181,19 @@ $(EXTRA_OPERATORS)/build/%_gpu.o: $(EXTRA_OPERATORS)/%.cu
 	$(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" -M -MT $(EXTRA_OPERATORS)/build/$*_gpu.o $< >$(EXTRA_OPERATORS)/build/$*_gpu.d
 	$(NVCC) -c -o $@ $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" $<
 
-# NOTE: to statically link libmxnet.a we need the option
-# --Wl,--whole-archive -lmxnet --Wl,--no-whole-archive
-lib/libmxnet.a: $(ALL_DEP)
-	@mkdir -p $(@D)
-	ar crv $@ $(filter %.o, $?)
-
 copy_cuda_deps:
 ifdef CUDA_DEP
 	@mkdir -p lib
 	cp $(CUDA_DEP) lib
 endif
 
-lib/libmxnet.so: $(ALL_DEP) copy_cuda_deps
+# NOTE: to statically link libmxnet.a we need the option
+# --Wl,--whole-archive -lmxnet --Wl,--no-whole-archive
+lib/libmxnet.$(STATIC_LIB_EXT): $(ALL_DEP)
+	@mkdir -p $(@D)
+	ar crv $@ $(filter %.o, $?)
+
+lib/libmxnet.$(SHARED_LIB_EXT): $(ALL_DEP) copy_cuda_deps
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -shared -o $@ $(filter %.o %.a, $^) $(LDFLAGS)
 

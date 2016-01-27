@@ -26,12 +26,15 @@ export NVCC = ${NVCC}
 
 # whether compile with debug
 DEBUG = 0
+WIN32 = ${WIN32}
 
 # the additional link flags you want to add
-ADD_LDFLAGS = -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
+ADD_LDFLAGS = ${ADD_LDFLAGS}
+ADD_LDFLAGS += -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
 
 # the additional compile flags you want to add
-ADD_CFLAGS = -I${DEPS}/include
+ADD_CFLAGS = ${ADD_CFLAGS}
+ADD_CFLAGS += -I${DEPS}/include
 
 #---------------------------------------------
 # matrix computation libraries for CPU/GPU
@@ -58,6 +61,11 @@ USE_OPENCV = 0
 
 # use openmp for parallelization
 USE_OPENMP = ${USE_OPENMP}
+ifneq ($(USE_OPENMP), 1)
+	export NO_OPENMP = 1
+	ADD_CFLAGS += -DDISABLE_OPENMP
+endif
+
 
 # choose the version of blas you want to use
 # can be: mkl, blas, atlas, openblas

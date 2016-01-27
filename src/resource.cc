@@ -190,8 +190,22 @@ class ResourceManagerImpl : public ResourceManager {
 };
 }  // namespace resource
 
+static resource::ResourceManagerImpl* instance_ptr = nullptr;
+static bool rm_shutdown = false;
+
 ResourceManager* ResourceManager::Get() {
-  static resource::ResourceManagerImpl inst;
-  return &inst;
+  if (instance_ptr == nullptr) {
+    if (rm_shutdown) LOG(FATAL) << "Resource manager already shutdone" << std::endl;
+    instance_ptr = new resource::ResourceManagerImpl();
+  }
+  return instance_ptr;
+}
+
+void ResourceManager::Shutdown() {
+  if (instance_ptr != nullptr) {
+    delete instance_ptr;
+    instance_ptr = nullptr;
+    rm_shutdown = true;
+  }
 }
 }  // namespace mxnet
