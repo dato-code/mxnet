@@ -244,7 +244,7 @@ if [[ $OSTYPE == linux* ]]; then
         USE_OPENMP=1
         WIN32=0
         USE_BLAS="blas"
-        SHARED_LINKER_FLAGS="-Wl,-rpath,\\\$\$ORIGIN -Wl,-rpath,${PWD}/deps/local/lib64 -Wl,-rpath,${PWD}/deps/local/lib"
+        SHARED_LINKER_FLAGS="-Wl,-rpath,\\\$\$ORIGIN -Wl,-rpath,${PWD}/deps/local/lib64 -Wl,-rpath,${PWD}/deps/local/lib -static-libstdc++"
 elif [[ $OSTYPE == darwin* ]]; then
         USE_OPENMP=0
         WIN32=0
