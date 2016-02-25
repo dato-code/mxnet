@@ -13,8 +13,9 @@ def find_lib_path():
         List of all found path to the libraries
     """
     curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
+    parent_path = os.path.join(curr_path, '../')
     api_path = os.path.join(curr_path, '../../lib/')
-    dll_path = [curr_path, api_path]
+    dll_path = [parent_path, curr_path, api_path]
     if os.name == 'nt':
         vs_configuration = 'Release'
         if platform.architecture()[0] == '64bit':
