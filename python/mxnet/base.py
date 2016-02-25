@@ -7,6 +7,8 @@ import sys
 import ctypes
 import numpy as np
 import atexit
+import logging
+import os
 from . import libinfo
 
 __all__ = ['MXNetError']
@@ -31,8 +33,19 @@ class MXNetError(Exception):
 
 def _load_lib():
     """Load libary by searching possible path."""
-    lib_path = libinfo.find_lib_path()
-    lib = ctypes.cdll.LoadLibrary(lib_path[0])
+    lib_path = libinfo.find_lib_path()[0]
+    cuda_lib_path = lib_path.replace('libmxnet.', 'libmxnet.cuda.')
+    if os.path.exists(cuda_lib_path):
+        try:
+            lib = ctypes.cdll.LoadLibrary(cuda_lib_path)
+            logging.info("CUDA GPU support is activated.")
+        except Exception as e:
+            logging.warn("Fail loading CUDA library. Error: %s" % e)
+            logging.info("Please try adding the CUDA installation path to LD_LIBRARY_PATH. Running CPU only mode.")
+            lib = ctypes.cdll.LoadLibrary(lib_path)
+    else:
+        logging.info("CUDA support is currently not available on this platform. Running CPU only mode.")
+        lib = ctypes.cdll.LoadLibrary(lib_path)
     # DMatrix functions
     lib.MXGetLastError.restype = ctypes.c_char_p
     return lib
