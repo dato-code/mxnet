@@ -79,13 +79,6 @@ ifneq ($(ADD_LDFLAGS), NONE)
 	LDFLAGS += $(ADD_LDFLAGS)
 endif
 
-ifneq ($(USE_CUDA_PATH), NONE)
-	NVCC = $(USE_CUDA_PATH)/bin/nvcc
-	CUDA_DEP = $(wildcard $(USE_CUDA_PATH)/lib64/libcudart.so*)
-	CUDA_DEP += $(wildcard $(USE_CUDA_PATH)/lib64/libcurand.so*)
-	CUDA_DEP += $(wildcard $(USE_CUDA_PATH)/lib64/libcublas.so*)
-endif
-
 # ps-lite
 PS_PATH=./ps-lite
 DEPS_PATH=$(shell pwd)/deps
@@ -100,7 +93,7 @@ include $(MXNET_PLUGINS)
 
 .PHONY: clean all test lint doc clean_all rcpplint rcppexport roxygen
 
-all: lib/libmxnet.$(STATIC_LIB_EXT) lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
+all: lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
 
 SRC = $(wildcard src/*.cc src/*/*.cc)
 OBJ = $(patsubst %.cc, build/%.o, $(SRC))
@@ -165,6 +158,11 @@ build/plugin/%.o: plugin/%.cc
 	$(CXX) -std=c++0x $(CFLAGS) -MM -MT build/plugin/$*.o $< >build/plugin/$*.d
 	$(CXX) -std=c++0x -c $(CFLAGS) -c $< -o $@
 
+build/plugin/%.o: plugin/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) -std=c++0x $(CFLAGS) -MM -MT build/plugin/$*.o $< >build/plugin/$*.d
+	$(CXX) -std=c++0x -c $(CFLAGS) -c $< -o $@
+
 # A nvcc bug cause this to generate "generic/xxx.h" dependencies from torch headers.
 # $(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS)" -M -MT build/plugin/$*_gpu.o $< >build/plugin/$*_gpu.d
 build/plugin/%_gpu.o: plugin/%.cu
@@ -180,12 +178,6 @@ $(EXTRA_OPERATORS)/build/%_gpu.o: $(EXTRA_OPERATORS)/%.cu
 	@mkdir -p $(@D)
 	$(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" -M -MT $(EXTRA_OPERATORS)/build/$*_gpu.o $< >$(EXTRA_OPERATORS)/build/$*_gpu.d
 	$(NVCC) -c -o $@ $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" $<
-
-# NOTE: to statically link libmxnet.a we need the option
-# --Wl,--whole-archive -lmxnet --Wl,--no-whole-archive
-lib/libmxnet.$(STATIC_LIB_EXT): $(ALL_DEP)
-	@mkdir -p $(@D)
-	ar crv $@ $(filter %.o, $?)
 
 lib/libmxnet.$(SHARED_LIB_EXT): $(ALL_DEP)
 	@mkdir -p $(@D)

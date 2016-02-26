@@ -5,9 +5,8 @@
  * \author Bing Xu
 */
 
-#include <unity/lib/image_util.hpp>
-#include <unity/lib/gl_sframe.hpp>
-#include <unity/lib/gl_sarray.hpp>
+#include <graphlab/sdk/gl_sframe.hpp>
+#include <graphlab/sdk/gl_sarray.hpp>
 #include <mxnet/io.h>
 #include <dmlc/base.h>
 #include <dmlc/io.h>
