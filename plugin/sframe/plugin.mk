@@ -12,4 +12,4 @@ SFRAME_SRC += $(wildcard $(SFRAME_HOME)/image/png_io.cpp)
 SFRAME_OBJ = $(patsubst %.cpp, build/%.o, $(SFRAME_SRC))
 PLUGIN_OBJ += $(SFRAME_OBJ)
 CFLAGS += -I$(SFRAME_HOME)
-LDFLAGS += -lboost_system -lboost_filesystem -lpng -ljpeg
+LDFLAGS += -lboost_system -lboost_filesystem -lpng -ljpeg -lz
