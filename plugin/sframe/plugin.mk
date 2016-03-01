@@ -11,5 +11,5 @@ SFRAME_SRC += $(wildcard $(SFRAME_HOME)/image/png_io.cpp)
 # Make dependency objects
 SFRAME_OBJ = $(patsubst %.cpp, build/%.o, $(SFRAME_SRC))
 PLUGIN_OBJ += $(SFRAME_OBJ)
-CFLAGS += -I$(SFRAME_HOME)
+CFLAGS += -I$(SFRAME_HOME) -Wno-c++11-narrowing
 LDFLAGS += -lboost_system -lboost_filesystem -lpng -ljpeg -lz

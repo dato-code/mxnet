@@ -79,6 +79,10 @@ ifneq ($(ADD_LDFLAGS), NONE)
 	LDFLAGS += $(ADD_LDFLAGS)
 endif
 
+ifneq ($(USE_CUDA_PATH), NONE)
+	NVCC = $(USE_CUDA_PATH)/bin/nvcc
+endif
+
 # ps-lite
 PS_PATH=./ps-lite
 DEPS_PATH=$(shell pwd)/deps
