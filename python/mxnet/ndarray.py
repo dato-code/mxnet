@@ -12,6 +12,7 @@ from .base import mx_uint, mx_float, NDArrayHandle, FunctionHandle
 from .base import ctypes2buffer
 from .base import check_call, ctypes2docstring
 from .context import Context
+import sframe as gl
 
 _DTYPE_NP_TO_MX = {
     np.float32 : 0,
@@ -62,12 +63,33 @@ def _new_alloc_handle(shape, ctx, delay_alloc, dtype=mx_real_t):
         ctypes.byref(hdl)))
     return hdl
 
+def _copy_from_sframe(sf, arr, start, end, bias=0):
+    callback = _LIB.MXNDArraySyncCopyFromSFrame
+    callback.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint]
+    callback.restype = ctypes.c_int
+    addr = ctypes.cast(callback, ctypes.c_void_p).value
+    handle = arr.handle.value
+    gl.extensions.sframe_callback(sf, addr, handle, start, end, bias)
+
+def _copy_from_sarray(sa, arr, start, end, bias=0):
+    callback = _LIB.MXNDArraySyncCopyFromSFrame
+    callback.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint]
+    callback.restype = ctypes.c_int
+    addr = ctypes.cast(callback, ctypes.c_void_p).value
+    handle = arr.handle.value
+    gl.extensions.sarray_callback(sa, addr, handle, start, end, bias)
+
+
+
 def waitall():
     """Wait all async operation to finish in MXNet
 
     This function is used for benchmark only
     """
     check_call(_LIB.MXNDArrayWaitAll())
+
 
 class NDArray(object):
     """NDArray object in mxnet.

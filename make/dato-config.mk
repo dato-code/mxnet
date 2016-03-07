@@ -34,6 +34,7 @@ ADD_LDFLAGS += -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
 
 # the additional compile flags you want to add
 ADD_CFLAGS = ${ADD_CFLAGS}
+ADD_CFLAGS += -Iplugin/SFrameSubtree/oss_src
 ADD_CFLAGS += -I${DEPS}/include
 
 #---------------------------------------------
@@ -104,5 +105,3 @@ EXTRA_OPERATORS =
 #----------------------------
 # plugins
 #----------------------------
-# whether to use sframe integration. This requires build sframe
-MXNET_PLUGINS += plugin/sframe/plugin.mk

@@ -12,35 +12,42 @@
 #include <unity/lib/toolkit_function_macros.hpp>
 using namespace graphlab;
 
-void sarray_callback(graphlab::gl_sarray input, size_t callback_addr,
-                     size_t begin, size_t end) {
-  typedef bool(*callback_type)(const flexible_type*);
+void sarray_callback(graphlab::gl_sarray input, size_t callback_addr, size_t callback_data_addr,
+                     size_t begin, size_t end, size_t bias) {
+  typedef int(*callback_type)(void*, const flexible_type*, size_t, size_t, size_t);
   callback_type callback_fun = (callback_type)(callback_addr);
   auto ra = input.range_iterator(begin, end);
   auto iter = ra.begin();
+  size_t idx = bias;
+  size_t sz = end - begin;
   while (iter != ra.end()) {
-    bool success = callback_fun(&(*iter));
-    if (!success) log_and_throw("Error applying callback");
+    int unsuccess = callback_fun((void*)(callback_data_addr), &(*iter), 1, idx++, sz);
+    if (unsuccess) log_and_throw("Error applying callback");
     ++iter;
   }
 }
 
-void sframe_callback(graphlab::gl_sframe input, size_t callback_addr,
-                     size_t begin, size_t end) {
+void sframe_callback(graphlab::gl_sframe input, size_t callback_addr, size_t callback_data_addr,
+                     size_t begin, size_t end, size_t bias) {
   ASSERT_MSG(input.num_columns() > 0, "SFrame has no column");
-  typedef bool(*callback_type)(const flexible_type*, size_t);
+  typedef int(*callback_type)(void*, const flexible_type*, size_t, size_t, size_t);
   callback_type callback_fun = (callback_type)(callback_addr);
   auto ra = input.range_iterator(begin, end);
+  std::vector<flexible_type> row_vec;
   auto iter = ra.begin();
+  size_t idx = bias;
+  size_t sz = end - begin;
   while (iter != ra.end()) {
-    auto& row_vec = (*iter);
-    bool success = callback_fun(&(row_vec[0]), row_vec.size());
-    if (!success) log_and_throw("Error applying callback");
+    row_vec = (*iter);
+    int unsuccess = callback_fun((void*)(callback_data_addr), &(row_vec[0]),
+                                row_vec.size(), idx++, sz);
+
+    if (unsuccess) log_and_throw("Error applying callback");
     ++iter;
   }
 }
 
 BEGIN_FUNCTION_REGISTRATION
-REGISTER_FUNCTION(sarray_callback, "input", "callback_addr");
-REGISTER_FUNCTION(sframe_callback, "input", "callback_addr");
+REGISTER_FUNCTION(sarray_callback, "input", "callback_addr", "callback_data", "begin", "end", "bias");
+REGISTER_FUNCTION(sframe_callback, "input", "callback_addr", "callback_data", "begin", "end", "bias");
 END_FUNCTION_REGISTRATION
