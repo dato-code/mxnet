@@ -16,7 +16,7 @@ from .base import DataIterHandle, NDArrayHandle
 from .base import check_call, ctypes2docstring
 from .ndarray import NDArray
 from .ndarray import array
-
+from .ndarray import _copy_from_sarray, _copy_from_sframe
 
 DataBatch = namedtuple('DataBatch', ['data', 'label', 'pad', 'index'])
 
@@ -355,6 +355,95 @@ class NDArrayIter(DataIter):
             return self.cursor + self.batch_size - self.num_data
         else:
             return 0
+
+class SFrameIter(DataIter):
+    def __init__(self, sframe, data_field, data_shape, label_field=None, batch_size=1):
+        """
+        Single data input, single label SFrame iterator
+
+        Parameters
+        ----------
+        sframe: SFrame object
+            source SFrmae
+        data_field: string or list(string)
+            select fields of training data. For image or array type, only support string
+        data_shape: tuple
+            input data shape
+        label_field: string (optional)
+            label field in SFrame
+        batch_size: int
+            batch size
+        """
+
+        super(SFrameIter, self).__init__()
+        self.data_field = data_field
+        self.label_field = label_field
+        self.data_sframe = sframe[data_field]
+        if label_field != None:
+            self.label_sframe = sframe[label_field]
+        # allocate ndarray
+        data_shape = list(data_shape)
+        data_shape.insert(0, batch_size)
+        self.data_shape = tuple(data_shape)
+        self.label_shape = (batch_size, )
+        self.data_ndarray = array(np.zeros(self.data_shape))
+        self.label_ndarray = array(np.zeros(self.label_shape))
+        self.data = _init_data(self.data_ndarray, allow_empty=False, default_name="data")
+        self.label = _init_data(self.label_ndarray, allow_empty=True, default_name="softmax_label")
+        # size
+        self.batch_size = batch_size
+        self.data_size = len(sframe)
+        self.reset()
+
+    @property
+    def provide_data(self):
+        """The name and shape of data provided by this iterator"""
+        return [(k, tuple([self.batch_size] + list(v.shape[1:]))) for k, v in self.data]
+    @property
+    def provide_label(self):
+        """The name and shape of label provided by this iterator"""
+        return [(k, tuple([self.batch_size] + list(v.shape[1:]))) for k, v in self.label]
+
+    def reset(self):
+        self.pad = 0
+        self.cursor = 0
+
+    def _copy(self, start, end, bias=0):
+        if isinstance(self.data_field, list):
+            _copy_from_sframe(self.data_sframe, self.data_ndarray, start, end, bias)
+        else:
+            _copy_from_sarray(self.data_sframe, self.data_ndarray, start, end, bias)
+        if isinstance(self.label_field, str):
+            _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end)
+
+    def iter_next(self):
+        has_next = True
+        start = self.cursor
+        end = start + self.batch_size
+        if end > self.data_size:
+            has_next = False
+            self.pad = self.data_size - end
+            end = self.data_size
+        self._copy(start, end)
+        if self.pad > 0:
+            bias = self.batch_size - self.pad
+            start = 0
+            end = self.pad
+            self._copy(start, end, bias)
+            self.cursor = self.pad
+        else:
+            self.cursor += self.batch_size
+        return has_next
+
+    def getdata(self):
+        return [self.data_ndarray]
+
+    def getlabel(self):
+        return [self.label_ndarray]
+
+    def getpad(self):
+        return self.pad
+
 
 
 class MXDataIter(DataIter):
