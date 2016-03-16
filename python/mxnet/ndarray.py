@@ -12,7 +12,6 @@ from .base import mx_uint, mx_float, NDArrayHandle, FunctionHandle
 from .base import ctypes2buffer
 from .base import check_call, ctypes2docstring
 from .context import Context
-import sframe as gl
 
 _DTYPE_NP_TO_MX = {
     np.float32 : 0,
@@ -63,25 +62,31 @@ def _new_alloc_handle(shape, ctx, delay_alloc, dtype=mx_real_t):
         ctypes.byref(hdl)))
     return hdl
 
+
+class SFrameCallBackHandle(ctypes.Structure):
+    _fields_ = [('handle', ctypes.c_void_p), ('idx', ctypes.c_ulonglong), ('batch_size', ctypes.c_ulonglong)]
+
 def _copy_from_sframe(sf, arr, start, end, bias=0):
     callback = _LIB.MXNDArraySyncCopyFromSFrame
-    callback.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
-            ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint]
+    callback.argtypes = [ctypes.c_void_p, ctypes.c_ulonglong, ctypes.c_void_p]
     callback.restype = ctypes.c_int
     addr = ctypes.cast(callback, ctypes.c_void_p).value
-    handle = arr.handle.value
-    gl.extensions.sframe_callback(sf, addr, handle, start, end, bias)
+    callback_handle = SFrameCallBackHandle(arr.handle.value, bias, (end - start))
+    try:
+        import graphlab as gl
+    except:
+        import sframe as gl
+    assert isinstance(sf, gl.SFrame)
+    gl.extensions.sframe_callback(sf, addr, ctypes.addressof(callback_handle), start, end)
 
 def _copy_from_sarray(sa, arr, start, end, bias=0):
-    callback = _LIB.MXNDArraySyncCopyFromSFrame
-    callback.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
-            ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint]
-    callback.restype = ctypes.c_int
-    addr = ctypes.cast(callback, ctypes.c_void_p).value
-    handle = arr.handle.value
-    gl.extensions.sarray_callback(sa, addr, handle, start, end, bias)
-
-
+    try:
+        import graphlab as gl
+    except:
+        import sframe as gl
+    assert isinstance(sa, gl.SArray)
+    sf = gl.SFrame({'__tmp__': sa})
+    _copy_from_sframe(sf, arr, start, end, bias)
 
 def waitall():
     """Wait all async operation to finish in MXNet

@@ -154,11 +154,10 @@ if __name__ == '__main__':
         classifiers=classifiers,
         install_requires=[
             "boto == 2.33.0",
-            "mixpanel == 4.2.0",
             "decorator == 3.4.0",
             "tornado == 4.1",
             "prettytable == 0.7.2",
-            "requests == 2.3.0",
+            "requests == 2.9.1",
             "awscli == 1.6.2",
             "multipledispatch>=0.4.7",
             "certifi==2015.04.28" # we need to downgrade certifi to work with S3

@@ -31,10 +31,8 @@ endif
 ifneq ($(WIN32), 1)
 	CFLAGS += -fPIC
 	SHARED_LIB_EXT = so
-	STATIC_LIB_EXT = a
 else
 	SHARED_LIB_EXT = dll
-	STATIC_LIB_EXT = lib
 endif
 CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
@@ -93,6 +91,10 @@ ifeq ($(USE_DIST_KVSTORE), 1)
 	LDFLAGS += $(PS_LDFLAGS_A)
 endif
 
+# SFrame flexible_type
+LIB_DEP += flexible_type/build/libflexible_type.a
+
+# plugins
 include $(MXNET_PLUGINS)
 
 .PHONY: clean all test lint doc clean_all rcpplint rcppexport roxygen
@@ -193,6 +195,9 @@ $(PS_PATH)/build/libps.a:
 
 $(DMLC_CORE)/libdmlc.a:
 	+ cd $(DMLC_CORE); make libdmlc.a config=$(ROOTDIR)/$(config); cd $(ROOTDIR)
+
+flexible_type/build/libflexible_type.a:
+	$(MAKE) CXX=$(CXX) -C flexible_type
 
 bin/im2rec: tools/im2rec.cc $(ALL_DEP)
 

@@ -233,17 +233,18 @@ MXNET_DLL int MXNDArraySyncCopyFromCPU(NDArrayHandle handle,
  * This is useful to copy data from existing memory region that are
  * not wrapped by NDArray(thus dependency not being tracked).
  *
- * \param handle the NDArray handle
+ * \param callback_handle pointer to struct of callback function state 
  * \param data the data source to copy from
  * \param size the element size to copy
- * \param idx data index in batch
- * \param batch_size total batch size
  */
-MXNET_DLL int MXNDArraySyncCopyFromSFrame(NDArrayHandle handle,
-                                          const void *data,
+struct SFrameCallbackHandle {
+  NDArrayHandle handle;
+  size_t idx;
+  size_t batch_size;
+};
+MXNET_DLL int MXNDArraySyncCopyFromSFrame(const void *data,
                                           size_t size,
-                                          size_t idx,
-                                          size_t batch_size);
+                                          void* callback_handle);
 /*!
  * \brief Perform a synchronize copyto a continugous CPU memory region.
  *

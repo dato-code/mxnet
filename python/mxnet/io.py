@@ -407,6 +407,7 @@ class SFrameIter(DataIter):
     def reset(self):
         self.pad = 0
         self.cursor = 0
+        self.has_next = True
 
     def _copy(self, start, end, bias=0):
         if isinstance(self.data_field, list):
@@ -417,23 +418,25 @@ class SFrameIter(DataIter):
             _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end)
 
     def iter_next(self):
-        has_next = True
-        start = self.cursor
-        end = start + self.batch_size
-        if end > self.data_size:
-            has_next = False
-            self.pad = self.data_size - end
-            end = self.data_size
-        self._copy(start, end)
-        if self.pad > 0:
-            bias = self.batch_size - self.pad
-            start = 0
-            end = self.pad
-            self._copy(start, end, bias)
-            self.cursor = self.pad
+        if self.has_next:
+            start = self.cursor
+            end = start + self.batch_size
+            if end >= self.data_size:
+                self.has_next = False
+                self.pad = self.data_size - end
+                end = self.data_size
+            self._copy(start, end)
+            if self.pad > 0:
+                bias = self.batch_size - self.pad
+                start = 0
+                end = self.pad
+                self._copy(start, end, bias)
+                self.cursor = self.pad
+            else:
+                self.cursor += self.batch_size
+            return True
         else:
-            self.cursor += self.batch_size
-        return has_next
+            return False
 
     def getdata(self):
         return [self.data_ndarray]

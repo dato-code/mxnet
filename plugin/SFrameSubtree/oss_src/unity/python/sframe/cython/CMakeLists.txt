@@ -13,7 +13,6 @@ endfunction()
 
 add_custom_target(cython_targets ALL)
 file(GLOB cython_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.pyx")
-# list(REMOVE_ITEM cython_sources "cy_pylambda_workers.pyx")
 
 foreach(source ${cython_sources})
   set(target "")
@@ -23,16 +22,6 @@ foreach(source ${cython_sources})
 endforeach()
 
 target_link_libraries(cy_server unity_server)
-
-# Take care of cy_pylambda_workers explicitly. 
-# set_source_files_properties("cy_pylambda_workers.pyx" PROPERTIES CYTHON_IS_CXX TRUE)
-# cython_add_module(cy_pylambda_workers "cy_pylambda_workers.pyx")
-# set_property(TARGET cy_pylambda_workers APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-rpath,$ORIGIN -Wl,-rpath,$ORIGIN/.. -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR} ")
-# target_link_libraries(cy_pylambda_workers pylambda_worker)
-# add_dependencies(cy_pylambda_workers release_binaries)
-
-
-
 
 ADD_CUSTOM_TARGET (oss_clean_cython)
 ADD_CUSTOM_COMMAND(
@@ -45,9 +34,8 @@ ADD_CUSTOM_COMMAND(
 if(WIN32)
   make_copy_target(cython_deps ALL
     TARGETS
-    ${UNITY_EXTENSION_LIBRARY}
-    unity_server
-    unity_toolkits_shared
+    ${UNITY_ALL_LIBRARIES}
+    ${INSTALLATION_BINARY_TARGETS}
     FILES
     ${INSTALLATION_BINARY_FILES}
     ${INSTALLATION_SYSTEM_BINARY_FILES}

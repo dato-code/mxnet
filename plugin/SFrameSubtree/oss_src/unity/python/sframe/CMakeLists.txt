@@ -29,7 +29,6 @@ endforeach()
 set(INSTALLATION_BINARY_TARGETS
   unity_server
   ## spark_unity
-  pylambda_worker
   minipsutil
 )
 
@@ -52,7 +51,7 @@ ADD_CUSTOM_COMMAND(
 )
 
 add_subdirectory(cython)
-add_subdirectory(_scripts)
+add_subdirectory(_spark)
 
 
 set_property(DIRECTORY PROPERTY INSTALLATION_EXTENSIONS "${INSTALLATION_EXTENSIONS}")

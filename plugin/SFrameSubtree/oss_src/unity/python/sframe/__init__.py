@@ -83,6 +83,7 @@ class DeprecationHelper(object):
 
 Graph = DeprecationHelper(SGraph)
 
+from .cython import cy_pylambda_workers
 ################### Extension Importing ########################
 from . import extensions
 from .extensions import ext_import
@@ -105,6 +106,7 @@ class _extensions_wrapper(object):
     return getattr(self._wrapped, name)
 
 import sys as _sys
+from . import _json as json # imports from _json.py in this directory
 
 _sys.modules[__name__ + ".extensions"] = _extensions_wrapper(_sys.modules[__name__ + ".extensions"])
 # rewrite the import
