@@ -62,12 +62,39 @@ def _new_alloc_handle(shape, ctx, delay_alloc, dtype=mx_real_t):
         ctypes.byref(hdl)))
     return hdl
 
+
+class SFrameCallBackHandle(ctypes.Structure):
+    _fields_ = [('handle', ctypes.c_void_p), ('idx', ctypes.c_ulonglong), ('batch_size', ctypes.c_ulonglong)]
+
+def _copy_from_sframe(sf, arr, start, end, bias=0):
+    callback = _LIB.MXNDArraySyncCopyFromSFrame
+    callback.argtypes = [ctypes.c_void_p, ctypes.c_ulonglong, ctypes.c_void_p]
+    callback.restype = ctypes.c_int
+    addr = ctypes.cast(callback, ctypes.c_void_p).value
+    callback_handle = SFrameCallBackHandle(arr.handle.value, bias, (end - start))
+    try:
+        import graphlab as gl
+    except:
+        import sframe as gl
+    assert isinstance(sf, gl.SFrame)
+    gl.extensions.sframe_callback(sf, addr, ctypes.addressof(callback_handle), start, end)
+
+def _copy_from_sarray(sa, arr, start, end, bias=0):
+    try:
+        import graphlab as gl
+    except:
+        import sframe as gl
+    assert isinstance(sa, gl.SArray)
+    sf = gl.SFrame({'__tmp__': sa})
+    _copy_from_sframe(sf, arr, start, end, bias)
+
 def waitall():
     """Wait all async operation to finish in MXNet
 
     This function is used for benchmark only
     """
     check_call(_LIB.MXNDArrayWaitAll())
+
 
 class NDArray(object):
     """NDArray object in mxnet.

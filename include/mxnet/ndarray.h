@@ -7,7 +7,6 @@
 #define MXNET_NDARRAY_H_
 
 #include <dmlc/base.h>
-#include <dmlc/logging.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <dmlc/registry.h>
@@ -18,6 +17,7 @@
 #include "./base.h"
 #include "./storage.h"
 #include "./engine.h"
+#include "./flexible_type.h"
 
 // check c++11
 #if DMLC_USE_CXX11 == 0
@@ -207,6 +207,21 @@ class NDArray {
    * \param size the size of the source array, in sizeof(DType) not raw btyes.
    */
   void SyncCopyFromCPU(const void *data, size_t size) const;
+  /*!
+   * \brief Do a synchnoize copy from SFrame
+   * This function will call WaitToWrite before the copy is performed.
+   * This is useful to copy data from existing memory region that are
+   * not wrapped by NDArray(thus dependency not being tracked).
+   *
+   * \param data sframe flexible type source
+   * \param size field lenth of data
+   * \param idx index in batch
+   * \param batch_size total batch size
+   */
+  void SyncCopyFromSFrame(const graphlab::flexible_type *data,
+                          size_t size,
+                          size_t idx,
+                          size_t batch_size) const;
   /*!
    * \brief Do a synchronize copy to a continugous CPU memory region.
    *

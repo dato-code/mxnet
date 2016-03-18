@@ -16,6 +16,8 @@
 #  $ make -j8
 #-------------------------------------------------------------------------------
 
+ROOTDIR = ${PROJECT_HOME}
+
 #---------------------
 # choice of compiler
 #--------------------
@@ -34,6 +36,7 @@ ADD_LDFLAGS += -L${DEPS}/lib -L${DEPS}/lib64 ${SHARED_LINKER_FLAGS}
 
 # the additional compile flags you want to add
 ADD_CFLAGS = ${ADD_CFLAGS}
+ADD_CFLAGS += -Iplugin/SFrameSubtree/oss_src
 ADD_CFLAGS += -I${DEPS}/include
 
 #---------------------------------------------
@@ -100,3 +103,7 @@ USE_S3 = 0
 
 # path to folders containing projects specific operators that you don't want to put in src/operators
 EXTRA_OPERATORS =
+
+#----------------------------
+# plugins
+#----------------------------

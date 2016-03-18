@@ -228,6 +228,24 @@ MXNET_DLL int MXNDArraySyncCopyFromCPU(NDArrayHandle handle,
                                        const void *data,
                                        size_t size);
 /*!
+ * \brief Perform a synchonize copy by using as SFrame callback
+ * This function will call WaitToWrite before the copy is performed.
+ * This is useful to copy data from existing memory region that are
+ * not wrapped by NDArray(thus dependency not being tracked).
+ *
+ * \param callback_handle pointer to struct of callback function state 
+ * \param data the data source to copy from
+ * \param size the element size to copy
+ */
+struct SFrameCallbackHandle {
+  NDArrayHandle handle;
+  size_t idx;
+  size_t batch_size;
+};
+MXNET_DLL int MXNDArraySyncCopyFromSFrame(const void *data,
+                                          size_t size,
+                                          void* callback_handle);
+/*!
  * \brief Perform a synchronize copyto a continugous CPU memory region.
  *
  *  This function will call WaitToRead before the copy is performed.

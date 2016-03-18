@@ -31,10 +31,8 @@ endif
 ifneq ($(WIN32), 1)
 	CFLAGS += -fPIC
 	SHARED_LIB_EXT = so
-	STATIC_LIB_EXT = a
 else
 	SHARED_LIB_EXT = dll
-	STATIC_LIB_EXT = lib
 endif
 CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
@@ -43,7 +41,10 @@ ifeq ($(DEBUG), 1)
 else
 	NVCCFLAGS = --use_fast_math -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 endif
-ROOTDIR = $(CURDIR)
+
+ifndef ROOTDIR
+	ROOTDIR = $(CURDIR)
+endif
 
 ifndef LINT_LANG
 	LINT_LANG="all"
@@ -81,9 +82,6 @@ endif
 
 ifneq ($(USE_CUDA_PATH), NONE)
 	NVCC = $(USE_CUDA_PATH)/bin/nvcc
-	CUDA_DEP = $(wildcard $(USE_CUDA_PATH)/lib64/libcudart.so*)
-	CUDA_DEP += $(wildcard $(USE_CUDA_PATH)/lib64/libcurand.so*)
-	CUDA_DEP += $(wildcard $(USE_CUDA_PATH)/lib64/libcublas.so*)
 endif
 
 # ps-lite
@@ -96,11 +94,16 @@ ifeq ($(USE_DIST_KVSTORE), 1)
 	LDFLAGS += $(PS_LDFLAGS_A)
 endif
 
+# SFrame flexible_type
+FLEXIBLE_TYPE = $(ROOTDIR)/flexible_type
+LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a
+
+# plugins
 include $(MXNET_PLUGINS)
 
 .PHONY: clean all test lint doc clean_all rcpplint rcppexport roxygen
 
-all: lib/libmxnet.$(STATIC_LIB_EXT) lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
+all: lib/libmxnet.$(SHARED_LIB_EXT) $(BIN)
 
 SRC = $(wildcard src/*.cc src/*/*.cc)
 OBJ = $(patsubst %.cc, build/%.o, $(SRC))
@@ -165,6 +168,11 @@ build/plugin/%.o: plugin/%.cc
 	$(CXX) -std=c++0x $(CFLAGS) -MM -MT build/plugin/$*.o $< >build/plugin/$*.d
 	$(CXX) -std=c++0x -c $(CFLAGS) -c $< -o $@
 
+build/plugin/%.o: plugin/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) -std=c++0x $(CFLAGS) -MM -MT build/plugin/$*.o $< >build/plugin/$*.d
+	$(CXX) -std=c++0x -c $(CFLAGS) -c $< -o $@
+
 # A nvcc bug cause this to generate "generic/xxx.h" dependencies from torch headers.
 # $(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS)" -M -MT build/plugin/$*_gpu.o $< >build/plugin/$*_gpu.d
 build/plugin/%_gpu.o: plugin/%.cu
@@ -181,15 +189,12 @@ $(EXTRA_OPERATORS)/build/%_gpu.o: $(EXTRA_OPERATORS)/%.cu
 	$(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" -M -MT $(EXTRA_OPERATORS)/build/$*_gpu.o $< >$(EXTRA_OPERATORS)/build/$*_gpu.d
 	$(NVCC) -c -o $@ $(NVCCFLAGS) -Xcompiler "$(CFLAGS) -Isrc/operator" $<
 
-# NOTE: to statically link libmxnet.a we need the option
-# --Wl,--whole-archive -lmxnet --Wl,--no-whole-archive
-lib/libmxnet.$(STATIC_LIB_EXT): $(ALL_DEP)
-	@mkdir -p $(@D)
-	ar crv $@ $(filter %.o, $?)
-
 lib/libmxnet.$(SHARED_LIB_EXT): $(ALL_DEP)
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -shared -o $@ $(filter %.o %.a, $^) $(LDFLAGS)
+
+$(FLEXIBLE_TYPE)/build/libflexible_type.a:
+	+ cd $(FLEXIBLE_TYPE); make CXX=$(CXX); cd $(ROOTDIR)
 
 $(PS_PATH)/build/libps.a:
 	$(MAKE) CXX=$(CXX) DEPS_PATH=$(DEPS_PATH) -C $(PS_PATH) ps
@@ -240,12 +245,14 @@ clean:
 	$(RM) -r build lib bin *~ */*~ */*/*~ */*/*/*~
 	cd $(DMLC_CORE); make clean; cd -
 	cd $(PS_PATH); make clean; cd -
+	cd $(FLEXIBLE_TYPE); make clean; cd -
 	$(RM) -r $(EXTRA_OPERATORS)/build
 else
 clean:
 	$(RM) -r build lib bin *~ */*~ */*/*~ */*/*/*~
 	cd $(DMLC_CORE); make clean; cd -
 	cd $(PS_PATH); make clean; cd -
+	cd $(FLEXIBLE_TYPE); make clean; cd -
 endif
 
 clean_all: clean

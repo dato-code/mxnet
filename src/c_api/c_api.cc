@@ -10,6 +10,7 @@
 #include <dmlc/recordio.h>
 #include <mxnet/base.h>
 #include <mxnet/ndarray.h>
+#include <mxnet/flexible_type.h>
 #include <mxnet/symbolic.h>
 #include <mxnet/operator.h>
 #include <mxnet/optimizer.h>
@@ -180,6 +181,19 @@ int MXNDArraySyncCopyFromCPU(NDArrayHandle handle,
                              size_t size) {
   API_BEGIN();
   static_cast<NDArray*>(handle)->SyncCopyFromCPU(data, size);
+  API_END();
+}
+
+int MXNDArraySyncCopyFromSFrame(const void *data,
+                                size_t size,
+                                void* callback_handle_) {
+  API_BEGIN();
+  SFrameCallbackHandle* callback_handle = static_cast<SFrameCallbackHandle*>(callback_handle_);
+  const graphlab::flexible_type *flex_data
+    = reinterpret_cast<const graphlab::flexible_type*>(data);
+  static_cast<NDArray*>(callback_handle->handle)->SyncCopyFromSFrame(flex_data,
+      size, callback_handle->idx, callback_handle->batch_size);
+  ++callback_handle->idx;
   API_END();
 }
 

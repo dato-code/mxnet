@@ -563,6 +563,56 @@ void NDArray::SyncCopyFromCPU(const void *data, size_t size) const {
   }
 }
 
+void NDArray::SyncCopyFromSFrame(const graphlab::flexible_type *data, size_t size,
+                                 size_t idx, size_t batch_size) const {
+  CHECK_GE(size, 1);
+  this->WaitToWrite();
+  TShape dshape = this->shape();
+  TBlob dst = this->data();
+  CHECK_EQ(this->ctx().dev_type, Context::kCPU)
+    << "Only support copy SFrame to CPU NDarray";
+  CHECK_EQ(dst.type_flag_, mshadow::DataType<float>::kFlag);
+  auto type = data[0].get_type();
+  // TODO(bing): segfault in sframe if get 2d
+  if (size == 1 &&
+      (type == graphlab::flex_type_enum::FLOAT || type == graphlab::flex_type_enum::INTEGER)) {
+    mshadow::Tensor<cpu, 1> obj = dst.GetWithShape<cpu, 1, float>(
+      mshadow::Shape1(dshape[0]));
+    obj[idx] = data[0].to<float>();
+  } else {
+    mshadow::Tensor<cpu, 2> obj = dst.GetWithShape<cpu, 2, float>(
+      mshadow::Shape2(dshape[0], dshape.Size() / dshape[0]));
+    if (type == graphlab::flex_type_enum::VECTOR) {
+      CHECK_EQ(size, 1) << "Only support 1 field if input is array";
+      graphlab::flex_vec v = data[0].to<graphlab::flex_vec>();
+      for (size_t i = 0; i < v.size(); ++i) {
+        obj[idx][i] = static_cast<float>(v[i]);
+      }
+    } else if (type == graphlab::flex_type_enum::IMAGE) {
+      CHECK_EQ(size, 1) << "Only support 1 field if input is image";
+      auto img = data[0].to<graphlab::flex_image>();
+      mshadow::Tensor<cpu, 4> batch_tensor = dst.GetWithShape<cpu, 4, float>(
+        mshadow::Shape4(dshape[0], img.m_channels, img.m_height, img.m_width));
+      CHECK_EQ(img.is_decoded(), true) << "image must be decoded by using SFrame";
+      size_t cnt = 0;
+      const unsigned char* raw_data = img.get_image_data();
+      for (size_t i = 0; i < img.m_height; ++i) {
+        for (size_t j = 0; j < img.m_width; ++j) {
+          for (size_t k = 0; k < img.m_channels; ++k) {
+            batch_tensor[idx][k][i][j] = raw_data[cnt++];
+          }
+        }
+      }
+    } else if (type == graphlab::flex_type_enum::FLOAT ||
+              type == graphlab::flex_type_enum::INTEGER) {
+      CHECK_EQ(obj.shape_[1], size) << "Input dimension doesn't match";
+      for (size_t i = 0; i < size; ++i) {
+        obj[idx][i] = data[i].to<float>();
+      }
+    }
+  }
+}
+
 void NDArray::SyncCopyToCPU(void *data, size_t size) const {
   this->WaitToRead();
   TShape dshape = this->shape();

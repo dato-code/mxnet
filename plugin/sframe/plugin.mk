@@ -1,7 +1,15 @@
-SFRMAE_SRC = plugin/sframe/iter_sframe.cc
-PLUGIN_OBJ += build/plugin/sframe/iter_sframe.o
-CFLAGS += -I$(SFRAME_PATH)/oss_src/unity/lib/
-CFLAGS += -I$(SFRAME_PATH)/oss_src/
-LDFLAGS += -L$(SFRAME_PATH)/release/oss_src/unity/python/sframe/
-LDFLAGS += -lunity_shared
-LDFLAGS += -lboost_system
+SFRAME_HOME = plugin/SFrameSubtree/oss_src
+# Basic flexible types
+SFRAME_SRC = $(wildcard $(SFRAME_HOME)/flexible_type/*.cpp)
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/logger/*.cpp)
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/timer/*.cpp)
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/parallel/*.cpp)
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/image/image_type.cpp)
+# Image decoding stuff
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/image/jpeg_io.cpp)
+SFRAME_SRC += $(wildcard $(SFRAME_HOME)/image/png_io.cpp)
+# Make dependency objects
+SFRAME_OBJ = $(patsubst %.cpp, build/%.o, $(SFRAME_SRC))
+PLUGIN_OBJ += $(SFRAME_OBJ)
+CFLAGS += -I$(SFRAME_HOME) -Wno-c++11-narrowing
+LDFLAGS += -lboost_system -lboost_filesystem -lpng -ljpeg -lz

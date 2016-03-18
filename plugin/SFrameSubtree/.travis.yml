@@ -1,0 +1,19 @@
+language: python
+python:
+  - "2.7"
+  - "3.4"
+os:
+  - linux
+
+addons:
+  apt:
+    packages:
+      - build-essential
+      - zlib1g-dev
+      - ccache
+      - cmake
+cache:
+  directories:
+    - $HOME/.ccache
+
+script: oss_local_scripts/make_egg.sh --debug --num_procs=2 --skip_cpp_test
