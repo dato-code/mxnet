@@ -22,7 +22,7 @@ build/libflexible_type.a: $(OBJS)
 
 build/%.o: $(SFRAME_SRC)/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -std=c++11 -MM -MT build/$*.o $< >build/$*.d
+	$(CXX) $(CFLAGS) -std=c++0x -MM -MT build/$*.o $< >build/$*.d
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 build/flexible_type_test: test/flexible_type_test.cpp

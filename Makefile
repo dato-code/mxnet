@@ -197,7 +197,7 @@ $(DMLC_CORE)/libdmlc.a:
 	+ cd $(DMLC_CORE); make libdmlc.a config=$(ROOTDIR)/$(config); cd $(ROOTDIR)
 
 flexible_type/build/libflexible_type.a:
-	$(MAKE) CXX=$(CXX) -C flexible_type
+	+ cd flexible_type; $(MAKE) flexible_type CXX=$(CXX); cd $(ROOTDIR)
 
 bin/im2rec: tools/im2rec.cc $(ALL_DEP)
 
