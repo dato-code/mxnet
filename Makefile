@@ -41,7 +41,10 @@ ifeq ($(DEBUG), 1)
 else
 	NVCCFLAGS = --use_fast_math -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 endif
-ROOTDIR = $(CURDIR)
+
+ifndef ROOTDIR
+	ROOTDIR = $(CURDIR)
+endif
 
 ifndef LINT_LANG
 	LINT_LANG="all"
@@ -92,7 +95,8 @@ ifeq ($(USE_DIST_KVSTORE), 1)
 endif
 
 # SFrame flexible_type
-LIB_DEP += flexible_type/build/libflexible_type.a
+FLEXIBLE_TYPE = $(ROOTDIR)/flexible_type
+LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a
 
 # plugins
 include $(MXNET_PLUGINS)
@@ -189,15 +193,15 @@ lib/libmxnet.$(SHARED_LIB_EXT): $(ALL_DEP)
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -shared -o $@ $(filter %.o %.a, $^) $(LDFLAGS)
 
+$(FLEXIBLE_TYPE)/build/libflexible_type.a:
+	+ cd $(FLEXIBLE_TYPE); make CXX=$(CXX); cd $(ROOTDIR)
+
 $(PS_PATH)/build/libps.a:
 	$(MAKE) CXX=$(CXX) DEPS_PATH=$(DEPS_PATH) -C $(PS_PATH) ps
 	ln -fs $(PS_PATH)/tracker .
 
 $(DMLC_CORE)/libdmlc.a:
 	+ cd $(DMLC_CORE); make libdmlc.a config=$(ROOTDIR)/$(config); cd $(ROOTDIR)
-
-flexible_type/build/libflexible_type.a:
-	+ cd flexible_type; $(MAKE) flexible_type CXX=$(CXX); cd $(ROOTDIR)
 
 bin/im2rec: tools/im2rec.cc $(ALL_DEP)
 
@@ -241,12 +245,14 @@ clean:
 	$(RM) -r build lib bin *~ */*~ */*/*~ */*/*/*~
 	cd $(DMLC_CORE); make clean; cd -
 	cd $(PS_PATH); make clean; cd -
+	cd $(FLEXIBLE_TYPE); make clean; cd -
 	$(RM) -r $(EXTRA_OPERATORS)/build
 else
 clean:
 	$(RM) -r build lib bin *~ */*~ */*/*~ */*/*/*~
 	cd $(DMLC_CORE); make clean; cd -
 	cd $(PS_PATH); make clean; cd -
+	cd $(FLEXIBLE_TYPE); make clean; cd -
 endif
 
 clean_all: clean

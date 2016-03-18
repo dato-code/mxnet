@@ -4,8 +4,9 @@ endif
 
 SFRAME_SRC = $(PWD)/../plugin/SFrameSubtree/oss_src
 DMLC_SRC = $(PWD)/../dmlc-core/include
+DEPS = $(PWD)/../deps/local/include
 
-CFLAGS = -std=c++11 -msse2 -fPIC -O3 -Wall -finline-functions -I$(SFRAME_SRC) -I$(DMLC_SRC) -include $(PWD)/flexible_type.h
+CFLAGS = -std=c++11 -msse2 -fPIC -O3 -Wall -finline-functions -I$(DEPS) -I$(SFRAME_SRC) -I$(DMLC_SRC) -include $(PWD)/flexible_type.h
 
 all: flexible_type 
 
