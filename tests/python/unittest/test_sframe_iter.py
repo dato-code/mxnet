@@ -26,7 +26,7 @@ class SFrameIteratorBaseTest(unittest.TestCase):
             return
         cls.data = gl.SFrame({'x': np.random.randn(10),
                               'y': np.random.randint(2, size=10)})
-        cls.shape = [1]
+        cls.shape = (1,)
         cls.label_field = 'y'
         cls.data_field = 'x'
         cls.data_size = len(cls.data)
@@ -36,7 +36,6 @@ class SFrameIteratorBaseTest(unittest.TestCase):
 
     def test_one_batch(self):
         it = mxnet.io.SFrameIter(self.data, data_field=self.data_field,
-                                 data_shape=self.shape,
                                  label_field=self.label_field,
                                  batch_size=self.data_size)
         label_actual = []
@@ -50,7 +49,6 @@ class SFrameIteratorBaseTest(unittest.TestCase):
     def test_non_divisible_batch(self):
         batch_size = self.data_size + 1
         it = mxnet.io.SFrameIter(self.data, data_field=self.data_field,
-                                 data_shape=self.shape,
                                  label_field=self.label_field,
                                  batch_size=batch_size)
         label_actual = []
@@ -70,7 +68,6 @@ class SFrameIteratorBaseTest(unittest.TestCase):
         padding = 5
         batch_size = self.data_size + padding
         it = mxnet.io.SFrameIter(self.data, data_field=self.data_field,
-                                 data_shape=self.shape,
                                  label_field=self.label_field,
                                  batch_size=batch_size)
         label_expected = self.label_expected + [0.0] * padding
@@ -84,8 +81,11 @@ class SFrameIteratorBaseTest(unittest.TestCase):
         np.testing.assert_almost_equal(data_actual, data_expected)
 
     def test_shape_inference(self):
-        # TODO
-        pass
+        it = mxnet.io.SFrameIter(self.data, data_field=self.data_field,
+                                 label_field=self.label_field,
+                                 batch_size=1)
+        self.assertEquals(it.infer_shape(), self.shape)
+
 
 class SFrameArrayIteratorTest(SFrameIteratorBaseTest):
     @classmethod
@@ -94,7 +94,7 @@ class SFrameArrayIteratorTest(SFrameIteratorBaseTest):
             return
         cls.data = gl.SFrame({'x': [np.random.randn(5)] * 10,
                               'y': np.random.randint(2, size=10)})
-        cls.shape = [5]
+        cls.shape = (5,)
         cls.label_field = 'y'
         cls.data_field = 'x'
         cls.data_size = len(cls.data)
@@ -124,8 +124,8 @@ class SFrameImageIteratorTest(SFrameIteratorBaseTest):
         return cls
 
 
-class SFrameMultiColumnIteratorTest(SFrameIteratorBaseTest):
-    @classmethod
-    def setUpClass(cls):
-        # TODO
-        pass
+# class SFrameMultiColumnIteratorTest(SFrameIteratorBaseTest):
+#     @classmethod
+#     def setUpClass(cls):
+#         # TODO
+#         pass
