@@ -140,7 +140,7 @@ class SFrameImageIteratorTest(SFrameIteratorBaseTest):
         w = 2
         h = 3
         c = 1
-        d = w * h * c
+        d = 6
         self.data = gl.SFrame({'arr': [array.array('d', range(x, x + d)) for x in range(10)],
                               'y': np.random.randint(2, size=10)})
         self.data['img'] = self.data['arr'].pixel_array_to_image(w, h, c)
@@ -150,6 +150,15 @@ class SFrameImageIteratorTest(SFrameIteratorBaseTest):
         self.data_size = len(self.data)
         self.data_expected = list(x for arr in self.data['arr'] for x in arr)
         self.label_expected = list(self.data['y'])
+
+    def test_encoded_image(self):
+        # resize encodes the image
+        self.data['img'] = gl.image_analysis.resize(self.data['img'], 2, 3, 1)
+        self.test_shape_inference()
+        self.test_padding()
+        self.test_one_batch()
+        self.test_missing_value()
+        self.test_non_divisible_batch()
 
     def test_variable_size_image(self):
         shape1 = (2, 3, 1)

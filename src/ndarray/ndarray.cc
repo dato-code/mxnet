@@ -12,6 +12,10 @@
 #include <mshadow/tensor.h>
 #include "./ndarray_function.h"
 
+// from graphlab
+#include <image/image_type.hpp>
+#include <image/io.hpp>
+
 namespace dmlc {
 DMLC_REGISTRY_ENABLE(::mxnet::NDArrayFunctionReg);
 }  // namespace dmlc
@@ -580,16 +584,30 @@ void NDArray::SyncCopyFromSFrame(const graphlab::flexible_type *data, size_t siz
   auto type = data[0].get_type();
   if (type == graphlab::flex_type_enum::IMAGE) {
     CHECK_EQ(size, 1) << "Image data only support one input field";
-    auto img = data[0].to<graphlab::flex_image>();
+    graphlab::image_type img = data[0].get<graphlab::flex_image>();
     mshadow::Tensor<cpu, 4> batch_tensor = dst.GetWithShape<cpu, 4, float>(
         mshadow::Shape4(dshape[0], img.m_channels, img.m_height, img.m_width));
-    CHECK_EQ(img.is_decoded(), true) << "Image must be decoded by using SFrame";
+
+    // Shape check
     CHECK_EQ(dshape[1], img.m_channels) << "Unexpected image shape. Please use gl.image_analysis.resize() to resize the images. Expect channel is " 
                                         << dshape[1] << " actual " << img.m_channels;
     CHECK_EQ(dshape[2], img.m_height) << "Unexpected image shape. Please use gl.image_analysis.resize() to resize the images. Expect height is "
                                       << dshape[2] << " actual " << img.m_height;
     CHECK_EQ(dshape[3], img.m_width) << "Unexpected image shape. Please use gl.image_analysis.resize() to resize the images. Expect width is " 
                                      << dshape[3] << " actual " << img.m_width;
+    // Decode if needed
+    if (!img.is_decoded()) {
+      char* buf = NULL;
+      size_t length = 0;
+      if (img.m_format == graphlab::Format::JPG) {
+        graphlab::decode_jpeg((const char*)img.get_image_data(), img.m_image_data_size, &buf, length);
+      } else if (img.m_format == graphlab::Format::PNG) {
+        graphlab::decode_png((const char*)img.get_image_data(), img.m_image_data_size, &buf, length);
+      }
+      img.m_image_data.reset(buf);
+      img.m_image_data_size = length;
+      img.m_format = graphlab::Format::RAW_ARRAY;
+    }
     size_t cnt = 0;
     const unsigned char* raw_data = img.get_image_data();
     for (size_t i = 0; i < img.m_height; ++i) {

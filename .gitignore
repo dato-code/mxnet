@@ -97,3 +97,4 @@ tags
 
 miniconda.sh
 deps_version
+*.noseids
