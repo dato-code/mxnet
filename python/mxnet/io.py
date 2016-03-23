@@ -401,11 +401,14 @@ class SFrameIter(DataIter):
         self.data_sframe = sframe[data_field]
         if label_field is not None:
             self.label_sframe = sframe[label_field]
+
         # allocate ndarray
-        data_shape = list(self.infer_shape())
+        inferred_shape = self.infer_shape()
+        data_shape = list(inferred_shape["final_shape"])
         data_shape.insert(0, batch_size)
         self.data_shape = tuple(data_shape)
         self.label_shape = (batch_size, )
+        self.field_length = inferred_shape["field_length"]
         self.data_ndarray = array(np.zeros(self.data_shape))
         self.label_ndarray = array(np.zeros(self.label_shape))
         self.data = _init_data(self.data_ndarray, allow_empty=False, default_name="data")
@@ -457,25 +460,32 @@ class SFrameIter(DataIter):
             return (first_image.channels, first_image.height, first_image.width)
 
     def infer_shape(self):
+        ret = {"field_length": [], "final_shape": None}
         features = self.data_sframe.column_names()
         assert len(features) > 0
-
         if len(features) > 1:
+            # If more than one feature, all features must be numeric or array
             shape = 0
             for col in features:
-                colshape = self._infer_column_shape(self.data_sframe[col])[0]
+                colshape = self._infer_column_shape(self.data_sframe[col])
                 if len(colshape) != 1:
-                    raise ValueError("Image typed column cannot be mixed with other columns")
+                    raise ValueError('Only one column is allowed if input is image typed')
                 shape += colshape[0]
-            return (shape,)
+                ret["field_length"].append(colshape[0])
+            ret["final_shape"] = (shape,)
         else:
             col_shape = self._infer_column_shape(self.data_sframe[features[0]])
-            return col_shape
+            ret["final_shape"] = col_shape
+            length = 1
+            for x in col_shape:
+                length = length * x
+            ret["field_length"].append(length)
+        return ret
 
     def _copy(self, start, end, bias=0):
-        _copy_from_sframe(self.data_sframe, self.data_ndarray, start, end, bias)
+        _copy_from_sframe(self.data_sframe, self.data_ndarray, start, end, self.field_length, bias)
         if self.label_field is not None:
-            _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end)
+            _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end, 1, bias)
 
     def iter_next(self):
         if self.has_next:

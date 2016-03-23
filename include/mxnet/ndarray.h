@@ -217,11 +217,13 @@ class NDArray {
    * \param size field lenth of data
    * \param idx index in batch
    * \param batch_size total batch size
+   * \param field_length_p size (in number of floats) of each data element in the row
    */
   void SyncCopyFromSFrame(const graphlab::flexible_type *data,
                           size_t size,
                           size_t idx,
-                          size_t batch_size) const;
+                          size_t batch_size,
+                          size_t* field_length_p) const;
   /*!
    * \brief Do a synchronize copy to a continugous CPU memory region.
    *

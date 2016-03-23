@@ -192,7 +192,7 @@ int MXNDArraySyncCopyFromSFrame(const void *data,
   const graphlab::flexible_type *flex_data
     = reinterpret_cast<const graphlab::flexible_type*>(data);
   static_cast<NDArray*>(callback_handle->handle)->SyncCopyFromSFrame(flex_data,
-      size, callback_handle->idx, callback_handle->batch_size);
+      size, callback_handle->idx, callback_handle->batch_size, callback_handle->field_length_p);
   ++callback_handle->idx;
   API_END();
 }
