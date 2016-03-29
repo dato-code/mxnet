@@ -96,7 +96,8 @@ endif
 
 # SFrame flexible_type
 FLEXIBLE_TYPE = $(ROOTDIR)/flexible_type
-LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a
+LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a 
+LDFLAGS += -lpng -ljpeg -lz
 
 # plugins
 include $(MXNET_PLUGINS)

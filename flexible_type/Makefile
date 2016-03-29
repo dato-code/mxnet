@@ -16,7 +16,7 @@ clean:
 flexible_type: build/libflexible_type.a
 
 test: build/flexible_type_test
-OBJS = $(addprefix build/, flexible_type/flexible_type.o image/image_type.o)
+OBJS = $(addprefix build/, flexible_type/flexible_type.o image/image_type.o image/jpeg_io.o image/png_io.o)
 
 build/libflexible_type.a: $(OBJS)
 	ar crv $@ $(filter %.o, $?)
@@ -27,4 +27,4 @@ build/%.o: $(SFRAME_SRC)/%.cpp
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 build/flexible_type_test: test/flexible_type_test.cpp
-	$(CXX) $(CFLAGS) $< -o $@ -L build -lflexible_type
+	$(CXX) $(CFLAGS) $< -o $@ -L build -lflexible_type -lpng -ljpeg -lz

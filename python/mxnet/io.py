@@ -14,11 +14,13 @@ from .base import _LIB
 from .base import c_array, c_str, mx_uint, py_str
 from .base import DataIterHandle, NDArrayHandle
 from .base import check_call, ctypes2docstring
+from array import array as _array
 from .ndarray import NDArray
 from .ndarray import array
 from .ndarray import _copy_from_sarray, _copy_from_sframe
 
 DataBatch = namedtuple('DataBatch', ['data', 'label', 'pad', 'index'])
+
 
 class DataIter(object):
     """DataIter object in mxnet. """
@@ -356,36 +358,57 @@ class NDArrayIter(DataIter):
         else:
             return 0
 
+try:
+    import graphlab as gl
+except:
+    try:
+        import sframe as gl
+    except:
+        pass
+
+
 class SFrameIter(DataIter):
-    def __init__(self, sframe, data_field, data_shape, label_field=None, batch_size=1):
+    def __init__(self, sframe, data_field, label_field=None, batch_size=1):
         """
-        Single data input, single label SFrame iterator
+        Iterator over from SFrame
 
         Parameters
         ----------
         sframe: SFrame object
-            source SFrmae
+            source SFrame
         data_field: string or list(string)
             select fields of training data. For image or array type, only support string
-        data_shape: tuple
-            input data shape
         label_field: string (optional)
             label field in SFrame
-        batch_size: int
+        batch_size: int (optional)
             batch size
         """
 
         super(SFrameIter, self).__init__()
+        if not isinstance(sframe, gl.SFrame):
+            raise TypeError
+        if not (isinstance(data_field, str) or isinstance(data_field, list)):
+            raise TypeError
+        if not (label_field is None or isinstance(label_field, str)):
+            raise TypeError
+
+        if type(data_field) is str:
+            data_field = [data_field]
+
+        self._type_check(sframe, data_field, label_field)
         self.data_field = data_field
         self.label_field = label_field
         self.data_sframe = sframe[data_field]
-        if label_field != None:
+        if label_field is not None:
             self.label_sframe = sframe[label_field]
+
         # allocate ndarray
-        data_shape = list(data_shape)
+        inferred_shape = self.infer_shape()
+        data_shape = list(inferred_shape["final_shape"])
         data_shape.insert(0, batch_size)
         self.data_shape = tuple(data_shape)
         self.label_shape = (batch_size, )
+        self.field_length = inferred_shape["field_length"]
         self.data_ndarray = array(np.zeros(self.data_shape))
         self.label_ndarray = array(np.zeros(self.label_shape))
         self.data = _init_data(self.data_ndarray, allow_empty=False, default_name="data")
@@ -399,6 +422,7 @@ class SFrameIter(DataIter):
     def provide_data(self):
         """The name and shape of data provided by this iterator"""
         return [(k, tuple([self.batch_size] + list(v.shape[1:]))) for k, v in self.data]
+
     @property
     def provide_label(self):
         """The name and shape of label provided by this iterator"""
@@ -409,13 +433,59 @@ class SFrameIter(DataIter):
         self.cursor = 0
         self.has_next = True
 
-    def _copy(self, start, end, bias=0):
-        if isinstance(self.data_field, list):
-            _copy_from_sframe(self.data_sframe, self.data_ndarray, start, end, bias)
+    def _type_check(self, sframe, data_field, label_field):
+        if label_field is not None:
+            label_column_type = sframe[label_field].dtype()
+            if label_column_type not in [int, float]:
+                raise TypeError('Unexpected type for label_field \"%s\". Expect int or float, got %s' %
+                                (label_field, str(label_column_type)))
+        for col in data_field:
+            col_type = sframe[col].dtype()
+            if col_type not in [int, float, _array, gl.Image]:
+                raise TypeError('Unexpected type for data_field \"%s\". Expect int, float, array or image, got %s' %
+                               (col, str(col_type)))
+
+    def _infer_column_shape(self, sarray):
+        dtype = sarray.dtype()
+        if (dtype in [int, float]):
+            return (1, )
+        elif dtype is _array:
+            lengths = sarray.item_length()
+            if lengths.min() != lengths.max():
+                raise ValueError('Array column does not have the same length')
+            else:
+                return (lengths.max(), )
+        elif dtype is gl.Image:
+            first_image = sarray.dropna()[0]
+            return (first_image.channels, first_image.height, first_image.width)
+
+    def infer_shape(self):
+        ret = {"field_length": [], "final_shape": None}
+        features = self.data_sframe.column_names()
+        assert len(features) > 0
+        if len(features) > 1:
+            # If more than one feature, all features must be numeric or array
+            shape = 0
+            for col in features:
+                colshape = self._infer_column_shape(self.data_sframe[col])
+                if len(colshape) != 1:
+                    raise ValueError('Only one column is allowed if input is image typed')
+                shape += colshape[0]
+                ret["field_length"].append(colshape[0])
+            ret["final_shape"] = (shape,)
         else:
-            _copy_from_sarray(self.data_sframe, self.data_ndarray, start, end, bias)
-        if isinstance(self.label_field, str):
-            _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end)
+            col_shape = self._infer_column_shape(self.data_sframe[features[0]])
+            ret["final_shape"] = col_shape
+            length = 1
+            for x in col_shape:
+                length = length * x
+            ret["field_length"].append(length)
+        return ret
+
+    def _copy(self, start, end, bias=0):
+        _copy_from_sframe(self.data_sframe, self.data_ndarray, start, end, self.field_length, bias)
+        if self.label_field is not None:
+            _copy_from_sarray(self.label_sframe, self.label_ndarray, start, end, 1, bias)
 
     def iter_next(self):
         if self.has_next:
@@ -446,7 +516,6 @@ class SFrameIter(DataIter):
 
     def getpad(self):
         return self.pad
-
 
 
 class MXDataIter(DataIter):
