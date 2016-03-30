@@ -368,7 +368,7 @@ except:
 
 
 class SFrameIter(DataIter):
-    def __init__(self, sframe, data_field, label_field=None, batch_size=1):
+    def __init__(self, sframe, data_field, label_field=None, batch_size=1, data_name='data', label_name='softmax_label'):
         """
         Iterator over from SFrame
 
@@ -411,8 +411,8 @@ class SFrameIter(DataIter):
         self.field_length = inferred_shape["field_length"]
         self.data_ndarray = array(np.zeros(self.data_shape))
         self.label_ndarray = array(np.zeros(self.label_shape))
-        self.data = _init_data(self.data_ndarray, allow_empty=False, default_name="data")
-        self.label = _init_data(self.label_ndarray, allow_empty=True, default_name="softmax_label")
+        self.data = _init_data(self.data_ndarray, allow_empty=False, default_name=data_name)
+        self.label = _init_data(self.label_ndarray, allow_empty=True, default_name=label_name)
         # size
         self.batch_size = batch_size
         self.data_size = len(sframe)
