@@ -12,6 +12,7 @@ import os
 from . import libinfo
 
 __all__ = ['MXNetError']
+__LOGGER__ = logging.getLogger(__name__)
 #----------------------------
 # library loading
 #----------------------------
@@ -38,13 +39,13 @@ def _load_lib():
     if os.path.exists(cuda_lib_path):
         try:
             lib = ctypes.cdll.LoadLibrary(cuda_lib_path)
-            logging.info("CUDA GPU support is activated.")
+            __LOGGER__.info("CUDA GPU support is activated.")
         except Exception as e:
-            logging.warn("Fail loading CUDA library. Error: %s" % e)
-            logging.info("Please try adding the CUDA installation path to LD_LIBRARY_PATH. Running CPU only mode.")
+            __LOGGER__.warn("Fail loading CUDA library. Error: %s" % e)
+            __LOGGER__.info("Please try adding the CUDA installation path to LD_LIBRARY_PATH. Running CPU only mode.")
             lib = ctypes.cdll.LoadLibrary(lib_path)
     else:
-        logging.info("CUDA support is currently not available on this platform. Running CPU only mode.")
+        __LOGGER__.info("CUDA support is currently not available on this platform. Running CPU only mode.")
         lib = ctypes.cdll.LoadLibrary(lib_path)
     # DMatrix functions
     lib.MXGetLastError.restype = ctypes.c_char_p

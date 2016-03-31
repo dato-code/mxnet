@@ -6,7 +6,11 @@ import sys
 import math
 import logging
 import time
-from .model import save_checkpoint
+from .model import save_checkpoint as _save_checkpoint
+
+__LOGGER__ = logging.getLogger(__name__)
+__LOGGER__.setLevel(logging.INFO)
+__LOGGER__.info('callback logger activated')
 
 def do_checkpoint(prefix):
     """Callback to checkpoint the model to prefix every epoch.
@@ -19,11 +23,11 @@ def do_checkpoint(prefix):
     Returns
     -------
     callback : function
-        The callback function that can be passed as iter_end_callback to fit.
+        The callback function that can be passed as epoch_end_callback to fit.
     """
     def _callback(iter_no, sym, arg, aux):
         """The checkpoint function."""
-        save_checkpoint(prefix, iter_no + 1, sym, arg, aux)
+        _save_checkpoint(prefix, iter_no + 1, sym, arg, aux)
     return _callback
 
 
@@ -38,13 +42,13 @@ def log_train_metric(period):
     Returns
     -------
     callback : function
-        The callback function that can be passed as iter_epoch_callback to fit.
+        The callback function that can be passed as epoch_end_callback to fit.
     """
     def _callback(param):
         """The checkpoint function."""
         if param.nbatch % period == 0:
             name, value = param.eval_metric.get()
-            logging.info('Iter[%d] Batch[%d] Train-%s=%f',
+            __LOGGER__.info('Iter[%d] Batch[%d] Train-%s=%f',
                          param.epoch, param.nbatch, name, value)
     return _callback
 
@@ -54,9 +58,10 @@ class Speedometer(object):
 
     Parameters
     ----------
-    batch_size: int
+    batch_size : int
         batch_size of data
-    frequent: int
+
+    frequent : int
         calcutaion frequent
     """
     def __init__(self, batch_size, frequent=50):
@@ -78,10 +83,10 @@ class Speedometer(object):
                 speed = self.frequent * self.batch_size / (time.time() - self.tic)
                 if param.eval_metric is not None:
                     name, value = param.eval_metric.get()
-                    logging.info("Epoch[%d] Batch [%d]\tSpeed: %.2f samples/sec\tTrain-%s=%f",
+                    __LOGGER__.info("Epoch[%d] Batch [%d]\tSpeed: %.2f samples/sec\tTrain-%s=%f",
                                  param.epoch, count, speed, name, value)
                 else:
-                    logging.info("Iter[%d] Batch [%d]\tSpeed: %.2f samples/sec",
+                    __LOGGER__.info("Iter[%d] Batch [%d]\tSpeed: %.2f samples/sec",
                                  param.epoch, count, speed)
                 self.tic = time.time()
         else:

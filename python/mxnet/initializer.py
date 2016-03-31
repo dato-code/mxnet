@@ -9,6 +9,8 @@ from . import random
 import logging
 import re
 
+__LOGGER__ = logging.getLogger(__name__)
+
 class Initializer(object):
     """Base class for Initializer."""
 
@@ -110,14 +112,14 @@ class Load(object):
                                                           self.param[name].shape)
             arr[:] = self.param[name]
             if self.verbose:
-                logging.info('Initialized %s by loading', name)
+                __LOGGER__.info('Initialized %s by loading', name)
         else:
             assert self.default_init is not None, \
                 "Cannot Initialize %s. Not found in loaded param " + \
                 "and no default Initializer is provided."
             self.default_init(name, arr)
             if self.verbose:
-                logging.info('Initialized %s by default', name)
+                __LOGGER__.info('Initialized %s by default', name)
 
 class Mixed(object):
     """Initialize with mixed Initializer

@@ -19,6 +19,8 @@ from .optimizer import get_updater
 from .executor import DataParallelExecutorManager, _check_arguments, _load_data
 
 BASE_ESTIMATOR = object
+__LOGGER__ = logging.getLogger(__name__)
+__LOGGER__.setLevel(logging.INFO)
 
 try:
     from sklearn.base import BaseEstimator
@@ -175,8 +177,7 @@ def _train_multi_device(symbol, ctx, arg_names, param_names, aux_names,
     - This function will inplace update the NDArrays in arg_parans and aux_states.
     """
     if logger is None:
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
+        logger = __LOGGER__
     executor_manager = DataParallelExecutorManager(symbol=symbol,
                                                    ctx=ctx,
                                                    train_data=train_data,
