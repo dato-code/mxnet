@@ -43,5 +43,6 @@ from . import monitor as mon
 
 from . import torch
 from . import torch as th
+from . import builtin_symbols
 
 __version__ = base.__version__

@@ -1,9 +1,9 @@
-from ... import mxnet as mx
+from .. import symbol
 
 def ConvFactory(data, num_filter, kernel, stride=(1,1), pad=(0, 0), name=None, suffix=''):
-    conv = mx.symbol.Convolution(data=data, workspace=512, num_filter=num_filter, kernel=kernel, stride=stride, pad=pad, name='conv_%s%s' %(name, suffix))
-    bn = mx.symbol.BatchNorm(data=conv, name='bn_%s%s' %(name, suffix))
-    act = mx.symbol.Activation(data=bn, act_type='relu', name='relu_%s%s' %(name, suffix))
+    conv = symbol.Convolution(data=data, workspace=512, num_filter=num_filter, kernel=kernel, stride=stride, pad=pad, name='conv_%s%s' %(name, suffix))
+    bn = symbol.BatchNorm(data=conv, name='bn_%s%s' %(name, suffix))
+    act = symbol.Activation(data=bn, act_type='relu', name='relu_%s%s' %(name, suffix))
     return act
 
 def InceptionFactoryA(data, num_1x1, num_3x3red, num_3x3, num_d3x3red, num_d3x3, pool, proj, name):
@@ -17,10 +17,10 @@ def InceptionFactoryA(data, num_1x1, num_3x3red, num_3x3, num_d3x3red, num_d3x3,
     cd3x3 = ConvFactory(data=cd3x3r, num_filter=num_d3x3, kernel=(3, 3), pad=(1, 1), name=('%s_double_3x3_0' % name))
     cd3x3 = ConvFactory(data=cd3x3, num_filter=num_d3x3, kernel=(3, 3), pad=(1, 1), name=('%s_double_3x3_1' % name))
     # pool + proj
-    pooling = mx.symbol.Pooling(data=data, kernel=(3, 3), stride=(1, 1), pad=(1, 1), pool_type=pool, name=('%s_pool_%s_pool' % (pool, name)))
+    pooling = symbol.Pooling(data=data, kernel=(3, 3), stride=(1, 1), pad=(1, 1), pool_type=pool, name=('%s_pool_%s_pool' % (pool, name)))
     cproj = ConvFactory(data=pooling, num_filter=proj, kernel=(1, 1), name=('%s_proj' %  name))
     # concat
-    concat = mx.symbol.Concat(*[c1x1, c3x3, cd3x3, cproj], name='ch_concat_%s_chconcat' % name)
+    concat = symbol.Concat(*[c1x1, c3x3, cd3x3, cproj], name='ch_concat_%s_chconcat' % name)
     return concat
 
 def InceptionFactoryB(data, num_3x3red, num_3x3, num_d3x3red, num_d3x3, name):
@@ -32,9 +32,9 @@ def InceptionFactoryB(data, num_3x3red, num_3x3, num_d3x3red, num_d3x3, name):
     cd3x3 = ConvFactory(data=cd3x3r, num_filter=num_d3x3, kernel=(3, 3), pad=(1, 1), stride=(1, 1), name=('%s_double_3x3_0' % name))
     cd3x3 = ConvFactory(data=cd3x3, num_filter=num_d3x3, kernel=(3, 3), pad=(1, 1), stride=(2, 2), name=('%s_double_3x3_1' % name))
     # pool + proj
-    pooling = mx.symbol.Pooling(data=data, kernel=(3, 3), stride=(2, 2), pool_type="max", name=('max_pool_%s_pool' % name))
+    pooling = symbol.Pooling(data=data, kernel=(3, 3), stride=(2, 2), pool_type="max", name=('max_pool_%s_pool' % name))
     # concat
-    concat = mx.symbol.Concat(*[c3x3, cd3x3, pooling], name='ch_concat_%s_chconcat' % name)
+    concat = symbol.Concat(*[c3x3, cd3x3, pooling], name='ch_concat_%s_chconcat' % name)
     return concat
 
 def get_symbol(num_classes = 21841):
@@ -56,14 +56,14 @@ def get_symbol(num_classes = 21841):
     """
 
     # data
-    data = mx.symbol.Variable(name="data")
+    data = symbol.Variable(name="data")
     # stage 1
     conv1 = ConvFactory(data=data, num_filter=96, kernel=(7, 7), stride=(2, 2), pad=(3, 3), name='conv1')
-    pool1 = mx.symbol.Pooling(data=conv1, kernel=(3, 3), stride=(2, 2), name='pool1', pool_type='max')
+    pool1 = symbol.Pooling(data=conv1, kernel=(3, 3), stride=(2, 2), name='pool1', pool_type='max')
     # stage 2
     conv2red = ConvFactory(data=pool1, num_filter=128, kernel=(1, 1), stride=(1, 1), name='conv2red')
     conv2 = ConvFactory(data=conv2red, num_filter=288, kernel=(3, 3), stride=(1, 1), pad=(1, 1), name='conv2')
-    pool2 = mx.symbol.Pooling(data=conv2, kernel=(3, 3), stride=(2, 2), name='pool2', pool_type='max')
+    pool2 = symbol.Pooling(data=conv2, kernel=(3, 3), stride=(2, 2), name='pool2', pool_type='max')
     # stage 2
     in3a = InceptionFactoryA(pool2, 96, 96, 96, 96, 144, "avg", 48, '3a')
     in3b = InceptionFactoryA(in3a, 96, 96, 144, 96, 144, "avg", 96, '3b')
@@ -78,9 +78,9 @@ def get_symbol(num_classes = 21841):
     in5a = InceptionFactoryA(in4e, 352, 192, 320, 160, 224, "avg", 128, '5a')
     in5b = InceptionFactoryA(in5a, 352, 192, 320, 192, 224, "max", 128, '5b')
     # global avg pooling
-    avg = mx.symbol.Pooling(data=in5b, kernel=(7, 7), stride=(1, 1), name="global_pool", pool_type='avg')
+    avg = symbol.Pooling(data=in5b, kernel=(7, 7), stride=(1, 1), name="global_pool", pool_type='avg')
     # linear classifier
-    flatten = mx.symbol.Flatten(data=avg, name='flatten')
-    fc1 = mx.symbol.FullyConnected(data=flatten, num_hidden=num_classes, name='fc1')
-    softmax = mx.symbol.SoftmaxOutput(data=fc1, name='softmax')
+    flatten = symbol.Flatten(data=avg, name='flatten')
+    fc1 = symbol.FullyConnected(data=flatten, num_hidden=num_classes, name='fc1')
+    softmax = symbol.SoftmaxOutput(data=fc1, name='softmax')
     return softmax

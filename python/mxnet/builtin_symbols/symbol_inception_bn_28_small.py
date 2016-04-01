@@ -1,10 +1,10 @@
-from ... import mxnet as mx
+from .. import symbol
 
 # Basic Conv + BN + ReLU factory
 def ConvFactory(data, num_filter, kernel, stride=(1,1), pad=(0, 0), act_type="relu"):
-    conv = mx.symbol.Convolution(data=data, num_filter=num_filter, kernel=kernel, stride=stride, pad=pad)
-    bn = mx.symbol.BatchNorm(data=conv)
-    act = mx.symbol.Activation(data = bn, act_type=act_type)
+    conv = symbol.Convolution(data=data, num_filter=num_filter, kernel=kernel, stride=stride, pad=pad)
+    bn = symbol.BatchNorm(data=conv)
+    act = symbol.Activation(data = bn, act_type=act_type)
     return act
 
 # A Simple Downsampling Factory
@@ -12,9 +12,9 @@ def DownsampleFactory(data, ch_3x3):
     # conv 3x3
     conv = ConvFactory(data=data, kernel=(3, 3), stride=(2, 2), num_filter=ch_3x3, pad=(1, 1))
     # pool
-    pool = mx.symbol.Pooling(data=data, kernel=(3, 3), stride=(2, 2), pool_type='max')
+    pool = symbol.Pooling(data=data, kernel=(3, 3), stride=(2, 2), pool_type='max')
     # concat
-    concat = mx.symbol.Concat(*[conv, pool])
+    concat = symbol.Concat(*[conv, pool])
     return concat
 
 # A Simple module
@@ -24,7 +24,7 @@ def SimpleFactory(data, ch_1x1, ch_3x3):
     # 3x3
     conv3x3 = ConvFactory(data=data, kernel=(3, 3), pad=(1, 1), num_filter=ch_3x3)
     #concat
-    concat = mx.symbol.Concat(*[conv1x1, conv3x3])
+    concat = symbol.Concat(*[conv1x1, conv3x3])
     return concat
 
 def get_symbol(num_classes = 10):
@@ -44,7 +44,7 @@ def get_symbol(num_classes = 10):
       network training by reducing internal covariate shift. arXiv preprint
       arXiv:1502.03167, 2015.
     """
-    data = mx.symbol.Variable(name="data")
+    data = symbol.Variable(name="data")
     conv1 = ConvFactory(data=data, kernel=(3,3), pad=(1,1), num_filter=96, act_type="relu")
     in3a = SimpleFactory(conv1, 32, 32)
     in3b = SimpleFactory(in3a, 32, 48)
@@ -56,8 +56,8 @@ def get_symbol(num_classes = 10):
     in4e = DownsampleFactory(in4d, 96)
     in5a = SimpleFactory(in4e, 176, 160)
     in5b = SimpleFactory(in5a, 176, 160)
-    pool = mx.symbol.Pooling(data=in5b, pool_type="avg", kernel=(7,7), name="global_pool")
-    flatten = mx.symbol.Flatten(data=pool, name="flatten1")
-    fc = mx.symbol.FullyConnected(data=flatten, num_hidden=num_classes, name="fc1")
-    softmax = mx.symbol.SoftmaxOutput(data=fc, name="softmax")
+    pool = symbol.Pooling(data=in5b, pool_type="avg", kernel=(7,7), name="global_pool")
+    flatten = symbol.Flatten(data=pool, name="flatten1")
+    fc = symbol.FullyConnected(data=flatten, num_hidden=num_classes, name="fc1")
+    softmax = symbol.SoftmaxOutput(data=fc, name="softmax")
     return softmax

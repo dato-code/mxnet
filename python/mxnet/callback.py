@@ -10,7 +10,6 @@ from .model import save_checkpoint as _save_checkpoint
 
 __LOGGER__ = logging.getLogger(__name__)
 __LOGGER__.setLevel(logging.INFO)
-__LOGGER__.info('callback logger activated')
 
 def do_checkpoint(prefix):
     """Callback to checkpoint the model to prefix every epoch.
