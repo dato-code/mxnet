@@ -368,21 +368,42 @@ except:
 
 
 class SFrameIter(DataIter):
-    def __init__(self, sframe, data_field, label_field=None, batch_size=1, data_name='data', label_name='softmax_label'):
-        """
-        Iterator over from SFrame
+    """DataIter from SFrame
+    Provides DataIter interface for SFrame, a highly scalable columnar DataFrame.
+    The iterator can simultaneously iterate over multiple columns indicated by `data_field` and `label_field`.
+    `data_field` can refer either a single image typed column or multiple numerical columns (int, float or array).
+    `label_field` con only refer to a single numerical column (int, float or array).
 
-        Parameters
-        ----------
-        sframe: SFrame object
-            source SFrame
-        data_field: string or list(string)
-            select fields of training data. For image or array type, only support string
-        label_field: string (optional)
-            label field in SFrame
-        batch_size: int (optional)
-            batch size
-        """
+    Parameters
+    ----------
+    sframe : SFrame object
+        source SFrame
+    data_field : string or list(string)
+        data fields of the SFrame. The seleted fields may be either a single image typed column,
+        or multiple numerical columns (int, float, array).
+    label_field : string (optional)
+        label field in SFrame
+    batch_size : int
+        batch size
+
+    Examples
+    --------
+    >>> import sframe as sf
+    >>> import mxnet as mx
+
+    >>> data = sf.SFrame({'x': [1,2,3], 'y': [.1, .5, .5], 'z': [[1,1,1], [2,2,2,], [3,3,3]]})
+    >>> dataiter = mx.io.SFrameIter(sframe=data, data_field=['x', 'z'], label_field='z')
+
+    >>> image_data = sf.SFrame('http://s3.amazonaws.com/dato-datasets/mnist/sframe/train')
+    >>> image_data_iter = mx.io.SFrameIter(sframe=data, data_field=['image'], label_field='label', batch_size=100)
+
+    Notes
+    -----
+    - Image column must contain images of the same size.
+    - Array column must contain arrays of the same length.
+    """
+
+    def __init__(self, sframe, data_field, label_field=None, batch_size=1, data_name='data', label_name='softmax_label'):
 
         super(SFrameIter, self).__init__()
         if not isinstance(sframe, gl.SFrame):
