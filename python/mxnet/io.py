@@ -477,7 +477,7 @@ class SFrameIter(DataIter):
             else:
                 return (lengths.max(), )
         elif dtype is gl.Image:
-            first_image = sarray.dropna()[0]
+            first_image = sarray.head(1)[0]
             return (first_image.channels, first_image.height, first_image.width)
 
     def infer_shape(self):
