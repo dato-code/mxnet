@@ -9,6 +9,8 @@ import logging
 from math import sqrt
 import re
 
+__LOGGER__ = logging.getLogger(__name__)
+
 
 class Monitor(object):
     """Monitor outputs, weights, and gradients for debugging.
@@ -113,7 +115,7 @@ class Monitor(object):
         """End collecting and print results"""
         res = self.toc()
         for n, k, v in res:
-            logging.info('Batch: {:7d} {:30s} {:s}'.format(n, k, v))
+            __LOGGER__.info('Batch: {:7d} {:30s} {:s}'.format(n, k, v))
 
 
 

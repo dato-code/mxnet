@@ -3,6 +3,7 @@
 
 import math
 import logging
+__LOGGER__ = logging.getLogger(__name__)
 
 class LearningRateScheduler(object):
     """Base class of learning rate scheduler"""
@@ -58,7 +59,7 @@ class FactorScheduler(LearningRateScheduler):
         lr = self.base_lr * math.pow(self.factor, int(iteration / self.step))
         if lr != self.old_lr:
             self.old_lr = lr
-            logging.info("At Iteration [%d]: Swith to new learning rate %.5f",
+            __LOGGER__.info("At Iteration [%d]: Swith to new learning rate %.5f",
                          iteration, lr)
         return lr
 

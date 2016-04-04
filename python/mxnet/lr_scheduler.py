@@ -4,6 +4,8 @@ progress
 """
 import logging
 
+__LOGGER__ = logging.getLogger()
+
 class LRScheduler(object):
     """Base class of a learning rate scheduler"""
     def __init__(self):
@@ -71,6 +73,6 @@ class FactorScheduler(LRScheduler):
         if num_update > self.count + self.step:
             self.count += self.step
             self.base_lr *= self.factor
-            logging.info("Update[%d]: Change learning rate to %0.5e",
+            __LOGGER__.info("Update[%d]: Change learning rate to %0.5e",
                          num_update, self.base_lr)
         return self.base_lr

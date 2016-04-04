@@ -19,6 +19,8 @@ from .optimizer import get_updater
 from .executor import DataParallelExecutorManager, _check_arguments, _load_data
 
 BASE_ESTIMATOR = object
+__LOGGER__ = logging.getLogger(__name__)
+__LOGGER__.setLevel(logging.INFO)
 
 try:
     from sklearn.base import BaseEstimator
@@ -35,6 +37,7 @@ BatchEndParam = namedtuple('BatchEndParams',
 def _create_kvstore(kvstore, num_device, arg_params):
     """Create kvstore
     This function select and create a proper kvstore if given the kvstore type
+
     Parameters
     ----------
     kvstore : KVStore or str
@@ -122,17 +125,18 @@ def _train_multi_device(symbol, ctx, arg_names, param_names, aux_names,
                         logger=None, work_load_list=None, monitor=None):
     """Internal training function on multiple devices.
     This function will also work for single device as well.
+
     Parameters
     ----------
     symbol : Symbol
         The network configuration
     ctx : list of Context
         The training devices.
-    arg_names: list of str
+    arg_names : list of str
         Name of all arguments of the network.
-    param_names: list of str
+    param_names : list of str
         Name of all trainable parameters of the network.
-    aux_names: list of str
+    aux_names : list of str
         Name of all auxiliary states of the network.
     input_shape : tuple
         Shape of input data batch.
@@ -175,7 +179,7 @@ def _train_multi_device(symbol, ctx, arg_names, param_names, aux_names,
     - This function will inplace update the NDArrays in arg_parans and aux_states.
     """
     if logger is None:
-        logger = logging
+        logger = __LOGGER__
     executor_manager = DataParallelExecutorManager(symbol=symbol,
                                                    ctx=ctx,
                                                    train_data=train_data,
@@ -293,6 +297,7 @@ def _train_multi_device(symbol, ctx, arg_names, param_names, aux_names,
 
 def save_checkpoint(prefix, epoch, symbol, arg_params, aux_params):
     """Checkpoint the model data into file.
+
     Parameters
     ----------
     prefix : str
@@ -305,6 +310,7 @@ def save_checkpoint(prefix, epoch, symbol, arg_params, aux_params):
         Model parameter, dict of name to NDArray of net's weights.
     aux_params : dict of str to NDArray
         Model parameter, dict of name to NDArray of net's auxiliary states.
+
     Notes
     -----
     - ``prefix-symbol.json`` will be saved for symbol.
@@ -320,6 +326,7 @@ def save_checkpoint(prefix, epoch, symbol, arg_params, aux_params):
 
 def load_checkpoint(prefix, epoch):
     """Load model checkpoint from file.
+
     Parameters
     ----------
     prefix : str
@@ -334,6 +341,7 @@ def load_checkpoint(prefix, epoch):
         Model parameter, dict of name to NDArray of net's weights.
     aux_params : dict of str to NDArray
         Model parameter, dict of name to NDArray of net's auxiliary states.
+
     Notes
     -----
     - symbol will be loaded from ``prefix-symbol.json``.
@@ -355,6 +363,7 @@ def load_checkpoint(prefix, epoch):
 class FeedForward(BASE_ESTIMATOR):
     """Model class of MXNet for training and predicting feedforward nets.
     This class is designed for a single-data single output supervised network.
+
     Parameters
     ----------
     symbol : Symbol
@@ -533,11 +542,13 @@ class FeedForward(BASE_ESTIMATOR):
 
     def predict(self, X, num_batch=None):
         """Run the prediction, always only use one device.
+
         Parameters
         ----------
         X : mxnet.DataIter
         num_batch : int or None
             the number of batch to run. Go though all batches if None
+
         Returns
         -------
         y : numpy.ndarray or a list of numpy.ndarray if the network has multiple outputs.
@@ -578,6 +589,7 @@ class FeedForward(BASE_ESTIMATOR):
             epoch_end_callback=None, batch_end_callback=None, kvstore='local', logger=None,
             work_load_list=None, monitor=None):
         """Fit the model.
+
         Parameters
         ----------
         X : DataIter, or numpy.ndarray/NDArray
@@ -615,6 +627,8 @@ class FeedForward(BASE_ESTIMATOR):
         work_load_list : float or int, optional
             The list of work load for different devices,
             in the same order as ctx
+        monitor : :class:`monitor.Monitor`
+            Monitoring weights and gradients.
         """
 
         data = self._init_iter(X, y, is_train=True)
@@ -663,13 +677,16 @@ class FeedForward(BASE_ESTIMATOR):
         The advantage of load/save is the file is language agnostic.
         This means the file saved using save can be loaded by other language binding of mxnet.
         You also get the benefit being able to directly load/save from cloud storage(S3, HDFS)
+
         Parameters
         ----------
         prefix : str
             Prefix of model name.
+
         See Also
         --------
         Symbol.load : the method to load the model back.
+
         Notes
         -----
         - ``prefix-symbol.json`` will be saved for symbol.
@@ -683,6 +700,7 @@ class FeedForward(BASE_ESTIMATOR):
     @staticmethod
     def load(prefix, epoch, ctx=None, **kwargs):
         """Load model checkpoint from file.
+
         Parameters
         ----------
         prefix : str
@@ -693,10 +711,12 @@ class FeedForward(BASE_ESTIMATOR):
             The device context of training and prediction.
         kwargs : dict
             other parameters for model, including num_epoch, optimizer and numpy_batch_size
+
         Returns
         -------
         model : FeedForward
             The loaded model that can be used for prediction.
+
         Notes
         -----
         - ``prefix-symbol.json`` will be saved for symbol.
@@ -713,10 +733,11 @@ class FeedForward(BASE_ESTIMATOR):
                num_epoch=None, epoch_size=None, optimizer='sgd', initializer=Uniform(0.01),
                eval_data=None, eval_metric='acc',
                epoch_end_callback=None, batch_end_callback=None,
-               kvstore='local', logger=None, work_load_list=None, **kwargs):
+               kvstore='local', logger=None, work_load_list=None, monitor=None, **kwargs):
         """Functional style to create a model.
         This function will be more consistent with functional
         languages such as R, where mutation is not allowed.
+
         Parameters
         ----------
         symbol : Symbol
@@ -762,6 +783,8 @@ class FeedForward(BASE_ESTIMATOR):
         work_load_list : list of float or int, optional
             The list of work load for different devices,
             in the same order as ctx
+        monitor : :class:`monitor.Monitor`
+            Monitoring weights and gradients.
         """
         model = FeedForward(symbol, ctx=ctx, num_epoch=num_epoch, epoch_size=epoch_size,
                             optimizer=optimizer, initializer=initializer, **kwargs)
@@ -770,5 +793,6 @@ class FeedForward(BASE_ESTIMATOR):
                   batch_end_callback=batch_end_callback,
                   kvstore=kvstore,
                   logger=logger,
-                  work_load_list=work_load_list)
+                  work_load_list=work_load_list,
+                  monitor=monitor)
         return model
