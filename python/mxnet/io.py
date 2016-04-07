@@ -478,6 +478,8 @@ class SFrameIter(DataIter):
                 return (lengths.max(), )
         elif dtype is gl.Image:
             first_image = sarray.head(1)[0]
+            if first_image is None:
+                raise ValueError('Column cannot contain missing value')
             return (first_image.channels, first_image.height, first_image.width)
 
     def infer_shape(self):
@@ -514,7 +516,7 @@ class SFrameIter(DataIter):
             end = start + self.batch_size
             if end >= self.data_size:
                 self.has_next = False
-                self.pad = self.data_size - end
+                self.pad = end - self.data_size
                 end = self.data_size
             self._copy(start, end)
             if self.pad > 0:
