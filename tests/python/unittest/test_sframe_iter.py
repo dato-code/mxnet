@@ -63,16 +63,20 @@ class SFrameIteratorBaseTest(unittest.TestCase):
     def test_padding(self):
         padding = 5
         batch_size = self.data_size + padding
+        shape_total = 1
+        for s in self.shape:
+            shape_total *= s
         it = mxnet.io.SFrameIter(self.data, data_field=self.data_field,
                                  label_field=self.label_field,
                                  batch_size=batch_size)
-        label_expected = self.label_expected + [0.0] * padding
-        data_expected = self.data_expected + list(np.zeros(self.shape).flatten()) * padding
+        label_expected = self.label_expected + self.label_expected[:padding]
+        data_expected = self.data_expected + self.data_expected[:(padding * shape_total)]
         label_actual = []
         data_actual = []
         for d in it:
             data_actual.extend(d.data[0].asnumpy().flatten())
             label_actual.extend(d.label[0].asnumpy().flatten())
+        self.assertEqual(d.pad, padding)
         np.testing.assert_almost_equal(label_actual, label_expected)
         np.testing.assert_almost_equal(data_actual, data_expected)
 
@@ -88,7 +92,7 @@ class SFrameIteratorBaseTest(unittest.TestCase):
             self.data_field = [self.data_field]
         for col in self.data_field:
             ls = list(data[col])
-            ls[0] = None
+            ls[1] = None
             data[col] = ls
         it = mxnet.io.SFrameIter(data, data_field=self.data_field)
         self.assertRaises(lambda: [it])
