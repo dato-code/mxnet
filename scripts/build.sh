@@ -4,6 +4,7 @@
 # Environment variables:
 # CUDA_PATH: set to build with cuda at particular location
 # TEST_GPU: set to run gpu unittest
+# SKIP_TEST: set to skip unittest
 # BUILD_NUMBER: the build number of the final artifact
 ##########
 
@@ -133,7 +134,7 @@ fi
 ## Test ##
 if [[ ! -z "$TEST_GPU" ]]; then
   unittest_with_cuda
-else
+elif [[ -z "$SKIP_TEST" ]]; then
   unittest
 fi
 
