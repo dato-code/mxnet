@@ -4,7 +4,7 @@
 # Environment variables:
 # CUDA_PATH: set to build with cuda at particular location
 # TEST_GPU: set to run gpu unittest
-# SKIP_TEST: set to skip unittest
+# PLATFORM: platform name of the final artifact, optional
 # BUILD_NUMBER: the build number of the final artifact
 ##########
 
@@ -97,12 +97,14 @@ function package {
 echo "============= Package =============="
 echo "Build number: $BUILD_NUMBER"
 
-if [[ $OSTYPE == linux* ]]; then
-  PLATFORM='linux'
-elif [[ $OSTYPE == darwin* ]]; then
-  PLATFORM='mac'
-elif [[ $OSTYPE == msys ]]; then
-  PLATFORM='windows'
+if [[ -z ${PLATFORM} ]]; then
+  if [[ $OSTYPE == linux* ]]; then
+    PLATFORM='linux'
+  elif [[ $OSTYPE == darwin* ]]; then
+    PLATFORM='mac'
+  elif [[ $OSTYPE == msys ]]; then
+    PLATFORM='windows'
+  fi
 fi
 
 TARGET_DIR=${WORKSPACE}/target
@@ -122,22 +124,20 @@ rm -rf ${TARGET_DIR}/*.tar.gz
 # Cleanup previous build ##
 clean_target_dir
 
-## Build ##
+## Standard build ##
+build
+unittest
+LIB_NAME='libmxnet'
+copy_artifact
+
+## GPU build ##
 if [[ ! -z "$CUDA_PATH" ]]; then
   build_with_cuda
+  if [[ ! -z "$TEST_GPU" ]]; then
+    unittest_with_cuda
+  fi
   LIB_NAME='libmxnet.cuda'
-else
-  build
-  LIB_NAME='libmxnet'
+  copy_artifact
 fi
 
-## Test ##
-if [[ ! -z "$TEST_GPU" ]]; then
-  unittest_with_cuda
-elif [[ -z "$SKIP_TEST" ]]; then
-  unittest
-fi
-
-## Copy artifacts and package into tar ball ## 
-copy_artifact
 package
