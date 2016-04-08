@@ -3,6 +3,7 @@
 ##########
 # Environment variables:
 # CUDA_PATH: set to build with cuda at particular location
+# TEST_GPU: set to run gpu unittest
 # BUILD_NUMBER: the build number of the final artifact
 ##########
 
@@ -83,6 +84,9 @@ fi
 set -x
 cp -r python/mxnet ${TARGET_DIR}/python/
 cp -r lib/libmxnet.${dll_ext} ${TARGET_DIR}/python/${LIB_NAME}.${dll_ext}
+if [[ $OSTYPE == linux* ]]; then
+  strip -s ${TARGET_DIR}/python/${LIB_NAME}.${dll_ext}
+fi
 set +x
 echo "====================================="
 }
@@ -117,19 +121,22 @@ rm -rf ${TARGET_DIR}/*.tar.gz
 # Cleanup previous build ##
 clean_target_dir
 
-## Standard build ##
-build
-unittest
-LIB_NAME='libmxnet'
-copy_artifact
-
-## CUDA build ##
+## Build ##
 if [[ ! -z "$CUDA_PATH" ]]; then
   build_with_cuda
-  unittest_with_cuda
   LIB_NAME='libmxnet.cuda'
-  copy_artifact
+else
+  build
+  LIB_NAME='libmxnet'
 fi
 
-## Package everything into tarball
+## Test ##
+if [[ ! -z "$TEST_GPU" ]]; then
+  unittest_with_cuda
+else
+  unittest
+fi
+
+## Copy artifacts and package into tar ball ## 
+copy_artifact
 package
