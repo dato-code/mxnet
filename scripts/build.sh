@@ -4,6 +4,7 @@
 # Environment variables:
 # CUDA_PATH: set to build with cuda at particular location
 # TEST_GPU: set to run gpu unittest
+# PLATFORM: platform name of the final artifact, optional
 # BUILD_NUMBER: the build number of the final artifact
 ##########
 
@@ -96,12 +97,14 @@ function package {
 echo "============= Package =============="
 echo "Build number: $BUILD_NUMBER"
 
-if [[ $OSTYPE == linux* ]]; then
-  PLATFORM='linux'
-elif [[ $OSTYPE == darwin* ]]; then
-  PLATFORM='mac'
-elif [[ $OSTYPE == msys ]]; then
-  PLATFORM='windows'
+if [[ -z ${PLATFORM} ]]; then
+  if [[ $OSTYPE == linux* ]]; then
+    PLATFORM='linux'
+  elif [[ $OSTYPE == darwin* ]]; then
+    PLATFORM='mac'
+  elif [[ $OSTYPE == msys ]]; then
+    PLATFORM='windows'
+  fi
 fi
 
 TARGET_DIR=${WORKSPACE}/target
