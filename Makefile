@@ -1,3 +1,5 @@
+ROOTDIR = $(CURDIR)
+
 ifndef config
 ifdef CXXNET_CONFIG
 	config = $(CXXNET_CONFIG)
@@ -9,7 +11,7 @@ endif
 endif
 
 ifndef DMLC_CORE
-	DMLC_CORE = dmlc-core
+	DMLC_CORE = $(ROOTDIR)/dmlc-core
 endif
 
 # use customized config file
@@ -85,7 +87,7 @@ ifneq ($(USE_CUDA_PATH), NONE)
 endif
 
 # ps-lite
-PS_PATH=./ps-lite
+PS_PATH=$(ROOTDIR)/ps-lite
 DEPS_PATH=$(shell pwd)/deps
 include $(PS_PATH)/make/ps.mk
 ifeq ($(USE_DIST_KVSTORE), 1)
@@ -111,6 +113,7 @@ OBJ = $(patsubst %.cc, build/%.o, $(SRC))
 CUSRC = $(wildcard src/*/*.cu)
 CUOBJ = $(patsubst %.cu, build/%_gpu.o, $(CUSRC))
 
+# extra operators
 ifneq ($(EXTRA_OPERATORS),)
 	EXTRA_SRC = $(wildcard $(EXTRA_OPERATORS)/*.cc $(EXTRA_OPERATORS)/*/*.cc)
 	EXTRA_OBJ = $(patsubst $(EXTRA_OPERATORS)/%.cc, $(EXTRA_OPERATORS)/build/%.o, $(EXTRA_SRC))
@@ -124,21 +127,24 @@ else
 endif
 
 # plugin
-ifeq ($(USE_TORCH), 1)
-	CFLAGS += -I$(TORCH_PATH)/install/include -I$(TORCH_PATH)/install/include/TH -I$(TORCH_PATH)/install/include/THC -DMXNET_USE_TORCH=1
-	LDFLAGS += -L$(TORCH_PATH)/install/lib -lluajit -lluaT -lTH -lTHC -L$(TORCH_PATH)/install/lib/lua/5.1 -lpaths -ltorch -lnn
-	ifeq ($(USE_CUDA), 1)
-		LDFLAGS += -lcutorch -lcunn
-	endif
+PLUGIN_OBJ =
+PLUGIN_CUOBJ =
+include $(MXNET_PLUGINS)
 
-	TORCH_SRC = $(wildcard plugin/torch/*.cc)
-	PLUGIN_OBJ += $(patsubst %.cc, build/%.o, $(TORCH_SRC))
-	TORCH_CUSRC = $(wildcard plugin/torch/*.cu)
-	PLUGIN_CUOBJ += $(patsubst %.cu, build/%_gpu.o, $(TORCH_CUSRC))
+# scala package profile
+ifeq ($(OS),Windows_NT)
+	# TODO(yizhi) currently scala package does not support windows
+	SCALA_PKG_PROFILE := windows
 else
-	CFLAGS += -DMXNET_USE_TORCH=0
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S), Darwin)
+		SCALA_PKG_PROFILE := osx-x86_64
+	else     
+		SCALA_PKG_PROFILE := linux-x86_64
+	endif
 endif
 
+# all dep
 LIB_DEP += $(DMLC_CORE)/libdmlc.a
 ALL_DEP = $(OBJ) $(EXTRA_OBJ) $(PLUGIN_OBJ) $(LIB_DEP)
 ifeq ($(USE_CUDA), 1)
@@ -151,7 +157,6 @@ ifeq ($(USE_NVRTC), 1)
 else
 	CFLAGS += -DMXNET_USE_NVRTC=0
 endif
-
 
 build/src/%.o: src/%.cc
 	@mkdir -p $(@D)
@@ -177,6 +182,7 @@ build/plugin/%.o: plugin/%.cpp
 # $(NVCC) $(NVCCFLAGS) -Xcompiler "$(CFLAGS)" -M -MT build/plugin/$*_gpu.o $< >build/plugin/$*_gpu.d
 build/plugin/%_gpu.o: plugin/%.cu
 	@mkdir -p $(@D)
+	$(CXX) -std=c++0x $(CFLAGS) -MM -MT build/plugin/$*_gpu.o $< >build/plugin/$*_gpu.d
 	$(NVCC) -c -o $@ $(NVCCFLAGS) -Xcompiler "$(CFLAGS)" $<
 
 $(EXTRA_OPERATORS)/build/%.o: $(EXTRA_OPERATORS)/%.cc
@@ -213,7 +219,7 @@ include tests/cpp/unittest.mk
 
 test: $(TEST)
 
-lint: rcpplint
+lint: rcpplint jnilint
 	python2 dmlc-core/scripts/lint.py mxnet ${LINT_LANG} include src plugin scripts python predict/python
 
 doc: doxygen
@@ -239,6 +245,33 @@ rpkg:	roxygen
 	cp -rf include/* R-package/inst/include
 	cp -rf dmlc-core/include/* R-package/inst/include/
 	R CMD build --no-build-vignettes R-package
+
+scalapkg:
+	(cd $(ROOTDIR)/scala-package; \
+		mvn clean package -P$(SCALA_PKG_PROFILE) -Dcxx="$(CXX)" \
+											-Dcflags="$(CFLAGS)" -Dldflags="$(LDFLAGS)" \
+											-Dlddeps="$(LIB_DEP)")
+
+scalatest:
+	(cd $(ROOTDIR)/scala-package; \
+		mvn verify -P$(SCALA_PKG_PROFILE) -Dcxx="$(CXX)" \
+							 -Dcflags="$(CFLAGS)" -Dldflags="$(LDFLAGS)" \
+							 -Dlddeps="$(LIB_DEP)" $(SCALA_TEST_ARGS))
+
+scalainstall:
+	(cd $(ROOTDIR)/scala-package; \
+		mvn install -P$(SCALA_PKG_PROFILE) -DskipTests -Dcxx="$(CXX)" \
+							  -Dcflags="$(CFLAGS)" -Dldflags="$(LDFLAGS)" \
+								-Dlddeps="$(LIB_DEP)")
+
+scaladeploy:
+	(cd $(ROOTDIR)/scala-package; \
+		mvn deploy -Prelease,$(SCALA_PKG_PROFILE) -DskipTests -Dcxx="$(CXX)" \
+							 -Dcflags="$(CFLAGS)" -Dldflags="$(LDFLAGS)" \
+							 -Dlddeps="$(LIB_DEP)")
+
+jnilint:
+	python2 dmlc-core/scripts/lint.py mxnet-jnicpp cpp scala-package/native/src
 
 ifneq ($(EXTRA_OPERATORS),)
 clean:
