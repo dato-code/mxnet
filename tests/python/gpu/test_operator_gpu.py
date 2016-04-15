@@ -8,7 +8,9 @@ import mxnet as mx
 import numpy as np
 from numpy.testing import assert_allclose
 
+# ignore for now because CUDA 7.0 doesn't support fp16
 
+"""
 def check_type_consistency(sym, ctx_list):
     tol = {np.dtype(np.float16): 1e-1,
            np.dtype(np.float32): 1e-4,
@@ -72,9 +74,7 @@ def test_activation_with_type():
                 {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float16}}]
     check_type_consistency(sym, ctx_list)
 
+"""
 if __name__ == '__main__':
-    test_convolution_with_type()
-    test_fullyconnected_with_type()
-    test_activation_with_type()
-	#test_softmax_with_shape((3,4), mx.gpu())
-    #test_multi_softmax_with_shape((3,4,5), mx.gpu())
+    # ignore test for cuda issue
+    pass
