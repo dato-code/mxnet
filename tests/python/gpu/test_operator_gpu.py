@@ -8,9 +8,6 @@ import mxnet as mx
 import numpy as np
 from numpy.testing import assert_allclose
 
-# ignore for now because CUDA 7.0 doesn't support fp16
-
-"""
 def check_type_consistency(sym, ctx_list):
     tol = {np.dtype(np.float16): 1e-1,
            np.dtype(np.float32): 1e-4,
@@ -50,7 +47,6 @@ def test_convolution_with_type():
     sym = mx.sym.Convolution(num_filter=3, kernel=(3,3), name='conv')
     ctx_list = [{'ctx': mx.gpu(0), 'conv_data': (2, 2, 10, 10), 'type_dict': {'conv_data': np.float64}},
                 {'ctx': mx.gpu(0), 'conv_data': (2, 2, 10, 10), 'type_dict': {'conv_data': np.float32}},
-                {'ctx': mx.gpu(0), 'conv_data': (2, 2, 10, 10), 'type_dict': {'conv_data': np.float16}},
                 {'ctx': mx.cpu(0), 'conv_data': (2, 2, 10, 10), 'type_dict': {'conv_data': np.float64}},
                 {'ctx': mx.cpu(0), 'conv_data': (2, 2, 10, 10), 'type_dict': {'conv_data': np.float32}}]
     check_type_consistency(sym, ctx_list)
@@ -59,7 +55,6 @@ def test_fullyconnected_with_type():
     sym = mx.sym.FullyConnected(num_hidden=3, name='inner')
     ctx_list = [{'ctx': mx.gpu(0), 'inner_data': (2, 10), 'type_dict': {'inner_data': np.float64}},
                 {'ctx': mx.gpu(0), 'inner_data': (2, 10), 'type_dict': {'inner_data': np.float32}},
-                {'ctx': mx.gpu(0), 'inner_data': (2, 10), 'type_dict': {'inner_data': np.float16}},
                 {'ctx': mx.cpu(0), 'inner_data': (2, 10), 'type_dict': {'inner_data': np.float64}},
                 {'ctx': mx.cpu(0), 'inner_data': (2, 10), 'type_dict': {'inner_data': np.float32}}]
     check_type_consistency(sym, ctx_list)
@@ -68,13 +63,11 @@ def test_activation_with_type():
     sym = mx.sym.Activation(name='act', act_type='sigmoid')
     ctx_list = [{'ctx': mx.gpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float64}},
                 {'ctx': mx.gpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float32}},
-                {'ctx': mx.gpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float16}},
                 {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float64}},
-                {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float32}},
-                {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float16}}]
+                {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float32}}]
     check_type_consistency(sym, ctx_list)
 
-"""
 if __name__ == '__main__':
-    # ignore test for cuda issue
-    pass
+    test_convolution_with_type()
+    test_fullyconnected_with_type()
+    test_activation_with_type()
