@@ -98,3 +98,16 @@ tags
 miniconda.sh
 deps_version
 *.noseids
+tags
+
+# Scala package
+*.class
+scala-package/*/target/
+scala-package/*/*/target/
+*.scala_dependencies
+*.worksheet
+*.idea
+*.iml
+*.classpath
+*.project
+*.settings

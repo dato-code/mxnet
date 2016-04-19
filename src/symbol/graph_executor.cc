@@ -8,6 +8,7 @@
 #include <mxnet/symbolic.h>
 #include <memory>
 #include <map>
+#include <set>
 #include "./graph_executor.h"
 #include "./graph_algorithm.h"
 
@@ -120,6 +121,17 @@ inline std::vector<std::pair<T, T> > GraphExecutor::GetInplaceOption(
   // get the node
   const StaticGraph::Node &node = graph_.nodes[node_id];
 
+  // AddTO: always use inplace when addto requirement presents.
+  if (node.addto_index.size() != 0) {
+    std::vector<std::pair<T, T> > remap(node.addto_index.size());
+    const size_t n = node.inputs.size() - node.addto_index.size();
+    for (size_t i = 0; i < node.addto_index.size(); ++i) {
+      remap[i] = std::make_pair(in_data[n + i],
+                                out_data[node.addto_index[i]]);
+    }
+    return remap;
+  }
+
   if (node.is_forward()) {
     std::vector<int> in_data_index(in_data.size());
     for (size_t i = 0; i < in_data.size(); ++i) {
@@ -185,7 +197,10 @@ GraphExecutor::GetOpExecEntry(uint32_t nid) {
   OpNode& op_node = op_nodes_[nid];
   std::vector<OpReqType> req;
   std::vector<NDArray> in_array, out_array, aux_array;
-  in_array.reserve(graph_.nodes[nid].inputs.size());
+  StaticGraph::Node& gnode = graph_.nodes[nid];
+  // AddTO: index is used to store in-place add resources.
+  const size_t ninput = gnode.inputs.size() - gnode.addto_index.size();
+  in_array.reserve(ninput);
   out_array.reserve(op_node.outputs.size());
   req.reserve(op_node.outputs.size());
   aux_array.reserve(op_node.aux_states.size());
@@ -197,13 +212,24 @@ GraphExecutor::GetOpExecEntry(uint32_t nid) {
     exec.mutate_vars.push_back(out.data.var());
     req.push_back(out.op_req);
   }
+
+  // AddTO: check the consistency
+  for (size_t i = 0; i < gnode.addto_index.size(); ++i) {
+    CHECK_EQ(req[gnode.addto_index[i]], kWriteInplace);
+    req[gnode.addto_index[i]] = kAddTo;
+    const StaticGraph::DataEntry& e = graph_.nodes[nid].inputs[i + ninput];
+    const DataEntryInfo &info = op_nodes_[e.source_id].outputs[e.index];
+    CHECK_EQ(info.inplace_op_id, static_cast<int>(nid));
+  }
+
   // aux
   for (const DataEntryInfo& aux : op_node.aux_states) {
     aux_array.push_back(aux.data);
     exec.mutate_vars.push_back(aux.data.var());
   }
   // input
-  for (StaticGraph::DataEntry e : graph_.nodes[nid].inputs) {
+  for (size_t i = 0; i < ninput; ++i) {
+    const StaticGraph::DataEntry& e = graph_.nodes[nid].inputs[i];
     const DataEntryInfo &info = op_nodes_[e.source_id].outputs[e.index];
     in_array.push_back(info.data);
     // skip inplace since they already appear in mutate vars
@@ -301,19 +327,21 @@ void GraphExecutor::InitGraph(const Symbol &symbol,
   for (const auto& head : graph_.heads) {
     head_nodes.push_back(head.source_id);
   }
-  std::sort(head_nodes.begin(), head_nodes.end());
-  head_nodes.resize(std::unique(head_nodes.begin(), head_nodes.end()) - head_nodes.begin());
   std::vector<uint32_t> fwd_nodes = graph_.PostDFSOrder(head_nodes, std::unordered_set<uint32_t>());
   num_forward_nodes_ = fwd_nodes.size();
 
   std::unordered_set<uint32_t> fwd_set(fwd_nodes.begin(), fwd_nodes.end());
   std::vector<uint32_t> topo = graph_.TopoSort();
-  std::vector<uint32_t>  backward;
+  std::unordered_set<uint32_t> fwd_bwd_set(topo.begin(), topo.end());
+  std::vector<uint32_t> backward;
 
-  for (uint32_t nid : topo) {
-    if (fwd_set.count(nid) != 0) {
+  for (uint32_t nid : fwd_nodes) {
+    if (fwd_bwd_set.count(nid) != 0) {
       topo_order_.push_back(nid);
-    } else {
+    }
+  }
+  for (uint32_t nid : topo) {
+    if (fwd_set.count(nid) == 0) {
       // TODO(tqchen) find less hacky way to decide mirror node.
       const std::string& name = graph_.nodes[nid].name;
       bool is_mirror = graph_.nodes[nid].is_forward() &&
@@ -346,7 +374,7 @@ void GraphExecutor::AssignContext(const Context default_ctx,
                                   std::vector<Context> *ctx_plan) {
   ctx_plan->resize(graph_.nodes.size());
   std::vector<bool> assigned(graph_.nodes.size(), false);
-  // assign context of node to the binded version
+  // assign context of node to the bound version
   for (size_t i = 0; i < graph_.arg_nodes.size(); ++i) {
     uint32_t nid = graph_.arg_nodes[i];
     assigned[nid] = true;
@@ -525,7 +553,7 @@ void GraphExecutor::InitDataEntryInfo(const std::vector<NDArray> &in_args,
   for (size_t i = 0; i < graph_.arg_nodes.size(); ++i) {
     out_shapes[graph_.arg_nodes[i]][0] = in_args[i].shape();
   }
-  CHECK(graph_.InferNodeShapes(topo_order_, &out_shapes, &aux_shapes))
+  CHECK(graph_.InferNodeShapes(topo_order_, &out_shapes, &aux_shapes, false))
       << "Shape inference cannot be complete in bind";
   for (size_t i = 0; i < out_shapes.size(); ++i) {
     for (size_t j = 0; j < out_shapes[i].size(); ++j) {
@@ -591,7 +619,7 @@ void GraphExecutor::InitDataEntryMemory() {
   }
 
   // use allocator to allocate memory.
-  GraphStorageAllocator allocator(&graph_, topo_order_);
+  GraphStorageAllocator allocator(&graph_, topo_order_, shared_mem_);
   for (size_t i = 0; i < topo_order_.size(); ++i) {
     uint32_t nid = topo_order_[i];
     if (!op_nodes_[nid].activated) continue;
@@ -612,6 +640,7 @@ void GraphExecutor::InitDataEntryMemory() {
       out_data[i] = &op_nodes_[nid].outputs[i];
       CHECK_NE(out_data[i]->type, kInternalAllocated);
     }
+
     auto inplace = GetInplaceOption(nid, in_data, out_data);
 
     for (std::pair<DataEntryInfo*, DataEntryInfo*> kv : inplace) {
@@ -747,7 +776,13 @@ void GraphExecutor::InitOpNodes() {
     if (graph_.nodes[nid].is_variable()) continue;
     OpNode& op_node = op_nodes_[nid];
     if (graph_.nodes[nid].is_forward()) {
-      op_node.op.reset(graph_.nodes[nid].op->CreateOperator(op_node.ctx));
+      std::vector<int> in_types;
+      std::vector<TShape> in_shapes;
+      for (auto e : graph_.nodes[nid].inputs) {
+        in_types.push_back(op_nodes_[e.source_id].outputs[e.index].type_flag);
+        in_shapes.push_back(op_nodes_[e.source_id].outputs[e.index].shape);
+      }
+      op_node.op.reset(graph_.nodes[nid].op->CreateOperatorEx(op_node.ctx, &in_shapes, &in_types));
     } else {
       CHECK(graph_.nodes[nid].is_backward());
       op_node.op.reset(new BackwardOpWrapper(
@@ -895,14 +930,15 @@ void GraphExecutor::Backward(const std::vector<NDArray> &head_grads) {
 
 Executor *Executor::Bind(Symbol symbol,
                          const Context& default_ctx,
-                        const std::map<std::string, Context>& group2ctx,
+                         const std::map<std::string, Context>& group2ctx,
                          const std::vector<NDArray> &in_args,
                          const std::vector<NDArray> &arg_grad_store,
                          const std::vector<OpReqType> &grad_req_type,
-                         const std::vector<NDArray> &aux_states) {
+                         const std::vector<NDArray> &aux_states,
+                         Executor* shared_exec) {
   GraphExecutor *exec = new GraphExecutor();
   exec->Init(symbol, default_ctx, group2ctx,
-             in_args, arg_grad_store, grad_req_type, aux_states);
+             in_args, arg_grad_store, grad_req_type, aux_states, shared_exec);
   return exec;
 }
 }  // namespace mxnet
