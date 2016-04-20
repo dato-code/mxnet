@@ -48,9 +48,15 @@ class DataIter(object):
         pass
 
     def next(self):
-        """Get next data batch from iterator. Equivalent to
-        self.iter_next()
-        DataBatch(self.getdata(), self.getlabel(), self.getpad(), None)
+        """Get next data batch from iterator.
+
+        Equivalent to
+
+        .. code-block:: python
+
+            self.iter_next()
+            DataBatch(self.getdata(), self.getlabel(), self.getpad(), None)
+
         Returns
         -------
         data : DataBatch
@@ -67,6 +73,7 @@ class DataIter(object):
 
     def iter_next(self):
         """Iterate to next batch.
+
         Returns
         -------
         has_next : boolean
@@ -86,6 +93,7 @@ class DataIter(object):
 
     def getlabel(self):
         """Get label of current batch.
+
         Returns
         -------
         label : NDArray
@@ -95,7 +103,7 @@ class DataIter(object):
 
     def getindex(self):
         """
-        Retures
+        Returns
         -------
         index : numpy.array
             The index of current batch
@@ -104,6 +112,7 @@ class DataIter(object):
 
     def getpad(self):
         """Get the number of padding examples in current batch.
+
         Returns
         -------
         pad : int
@@ -632,7 +641,6 @@ class MXDataIter(DataIter):
         self.provide_data = [(data_name, data.shape)]
         self.provide_label = [(label_name, label.shape)]
         self.batch_size = data.shape[0]
-
 
     def __del__(self):
         check_call(_LIB.MXDataIterFree(self.handle))

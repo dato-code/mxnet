@@ -652,6 +652,7 @@ class FeedForward(BASE_ESTIMATOR):
 
     def score(self, X, eval_metric='acc', num_batch=None, batch_end_callback=None, reset=True):
         """Run the model on X and calculate the score with eval_metric
+
         Parameters
         ----------
         X : mxnet.DataIter
@@ -659,6 +660,7 @@ class FeedForward(BASE_ESTIMATOR):
             The metric for calculating score
         num_batch : int or None
             the number of batch to run. Go though all batches if None
+
         Returns
         -------
         s : float
@@ -712,10 +714,10 @@ class FeedForward(BASE_ESTIMATOR):
             Training set label.
             If X is numpy.ndarray/NDArray, y is required to be set.
             While y can be 1D or 2D (with 2nd dimension as 1), its 1st dimension must be
-                the same as X, i.e. the number of data points and labels should be equal.
+            the same as X, i.e. the number of data points and labels should be equal.
         eval_data : DataIter or numpy.ndarray/list/NDArray pair
             If eval_data is numpy.ndarray/list/NDArray pair,
-                it should be (valid_data, valid_label).
+            it should be (valid_data, valid_label).
         eval_metric : metric.EvalMetric or str or callable
             The evaluation metric, name of evaluation metric.
             Or a customize evaluation function that returns the statistics
@@ -727,13 +729,15 @@ class FeedForward(BASE_ESTIMATOR):
             A callback that is invoked at end of each batch
             For print purpose
         kvstore: KVStore or str, optional
-           The KVStore or a string kvstore type:
-           'local' : multi-devices on a single machine, will automatically
-               choose one from 'local_update_cpu', 'local_allreduce_cpu', and
+            The KVStore or a string kvstore type:
+
+            * 'local' : multi-devices on a single machine, will automatically
+              choose one from 'local_update_cpu', 'local_allreduce_cpu', and
               'local_allreduce_device'
-           'dist_sync' : multi-machines with BSP
-           'dist_async' : multi-machines with partical asynchronous
-           In default uses 'local', often no need to change for single machiine.
+            * 'dist_sync' : multi-machines with BSP
+            * 'dist_async' : multi-machines with partical asynchronous
+
+            In default uses 'local', often no need to change for single machiine.
         logger : logging logger, optional
             When not specified, default logger will be used.
         work_load_list : float or int, optional
@@ -890,13 +894,15 @@ class FeedForward(BASE_ESTIMATOR):
             A callback that is invoked at end of each batch
             For print purpose
         kvstore: KVStore or str, optional
-           The KVStore or a string kvstore type:
-           'local' : multi-devices on a single machine, will automatically
-               choose one from 'local_update_cpu', 'local_allreduce_cpu', and
+            The KVStore or a string kvstore type:
+
+            * 'local' : multi-devices on a single machine, will automatically
+              choose one from 'local_update_cpu', 'local_allreduce_cpu', and
               'local_allreduce_device'
-           'dist_sync' : multi-machines with BSP
-           'dist_async' : multi-machines with partical asynchronous
-           In default uses 'local', often no need to change for single machiine.
+            * 'dist_sync' : multi-machines with BSP
+            * 'dist_async' : multi-machines with partical asynchronous
+
+            In default uses 'local', often no need to change for single machiine.
         logger : logging logger, optional
             When not specified, default logger will be used.
         work_load_list : list of float or int, optional
