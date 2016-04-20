@@ -95,7 +95,7 @@ class DataIter(object):
 
     def getindex(self):
         """
-        Retures
+        Returns
         -------
         index : numpy.array
             The index of current batch
