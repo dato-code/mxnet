@@ -324,8 +324,9 @@ class NDArrayIter(DataIter):
         Whether to shuffle the data
     last_batch_handle: 'pad', 'discard' or 'roll_over'
         How to handle the last batch
-    Note
-    ----
+
+    Notes
+    -----
     This iterator will pad, discard or roll over the last batch if
     the size of data does not match batch_size. Roll over is intended
     for training and can cause problems if used for prediction.

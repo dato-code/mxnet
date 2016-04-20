@@ -13,8 +13,8 @@ class Context(object):
     device_id : int (default=0)
         The device id of the device, needed for GPU
 
-    Note
-    ----
+    Notes
+    -----
     Context can also be used a way to change default context.
 
     Examples
