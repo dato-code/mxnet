@@ -11,7 +11,7 @@ def get_symbol(num_classes = 1000):
 
     References
     ----------
-    - Simonyan, Karen, and Andrew Zisserman. "Very deep convolutional networks for
+    Simonyan, Karen, and Andrew Zisserman. "Very deep convolutional networks for
     large-scale image recognition." arXiv preprint arXiv:1409.1556, 2014.
     """
 

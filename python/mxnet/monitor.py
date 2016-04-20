@@ -21,8 +21,8 @@ class Monitor(object):
         Number of batches between printing.
     stat_func : function
         a function that computes statistics of tensors.
-        Takes a NDArray and returns a NDArray. defaults to mean
-        absolute value |x|/size(x).
+        Takes a NDArray and returns a NDArray, defaults to mean
+        absolute value abs(x)/size(x).
     pattern : str
         A regular expression specifying which tensors to monitor.
         Only tensors with names that match name_pattern will be included.
