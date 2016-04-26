@@ -145,8 +145,13 @@ class SFrameImageIteratorTest(SFrameIteratorBaseTest):
         h = 3
         c = 1
         d = 6
-        self.data = gl.SFrame({'arr': [array.array('d', range(x, x + d)) for x in range(10)],
-                              'y': np.random.randint(2, size=10)})
+        n = 5
+        self.data = gl.SFrame({'arr': [array.array('d', range(0, 6)),
+                                       array.array('d', range(50, 56)),
+                                       array.array('d', range(100, 106)),
+                                       array.array('d', range(200, 206)),
+                                       array.array('d', range(249, 255))],
+                              'y': np.random.randint(2, size=n)})
         self.data['img'] = self.data['arr'].pixel_array_to_image(w, h, c)
         self.shape = (c, h, w)
         self.label_field = 'y'
