@@ -732,7 +732,7 @@ void NDArray::SyncCopyFromSFrame(const graphlab::flexible_type *data, size_t siz
       for (size_t i = 0; i < img.m_height; ++i) {
         for (size_t j = 0; j < img.m_width; ++j) {
           for (size_t k = 0; k < img.m_channels; ++k) {
-            batch_tensor[idx][k][i][j] = (unsigned char)buf[cnt++];
+            batch_tensor[idx][k][i][j] = static_cast<unsigned char>(buf[cnt++]);
           }
         }
       }
@@ -742,7 +742,7 @@ void NDArray::SyncCopyFromSFrame(const graphlab::flexible_type *data, size_t siz
       for (size_t i = 0; i < img.m_height; ++i) {
         for (size_t j = 0; j < img.m_width; ++j) {
           for (size_t k = 0; k < img.m_channels; ++k) {
-            batch_tensor[idx][k][i][j] = (unsigned char)raw_data[cnt++];
+            batch_tensor[idx][k][i][j] = static_cast<unsigned char>(raw_data[cnt++]);
           }
         }
       }
