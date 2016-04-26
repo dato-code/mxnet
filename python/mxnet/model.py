@@ -14,7 +14,7 @@ from . import optimizer as opt
 from . import metric
 from . import kvstore as kvs
 from .context import Context, cpu
-from .initializer import Uniform, Load
+from .initializer import Uniform, Load, Xavier
 from collections import namedtuple
 from .optimizer import get_updater
 from .executor_manager import DataParallelExecutorManager, _check_arguments, _load_data
@@ -918,88 +918,52 @@ class FeedForward(BASE_ESTIMATOR):
                   eval_batch_end_callback=eval_batch_end_callback)
         return model
 
-
-
-def _find_nodes_inputs(node_dict, arg_dict):
-    """Find the inputs of a given node in symbol graph
-
-    Parameters
-    ----------
-    node_dict: dict
-        Decoded node json in dict format
-    arg_dict: dict
-        Argument dict, this is taken from symbol json directly
-
-    Returns
-    -------
-    inputs: list
-        A list of input node info
-    """
-    inputs = []
-    for node_idx, output_idx in node_dict["inputs"]:
-        if node_idx not in arg_dict:
-            inputs.append([node_idx, output_idx])
-    return inputs
-
-def _get_feature_symbol(sym_json):
-    """Get feature extractor symbol from the given symbol
+def get_feature_symbol(model, top_layer=None):
+    """Get feature symbol from a model
     .. note::
-        This function is NOT working with multiple output network
-
-    Parameters
-    ----------
-    sym_json: str
-        symbol json in string format
-
-    Returns
-    -------
-    sym: mx.symbol.Symbol
-        symbol of feature extractor part
-    """
-
-    sym_dict = json.loads(sym_json)
-    arg_nodes = sym_dict["arg_nodes"]
-    arg_dict = dict(zip(arg_nodes, [True for i in range(len(arg_nodes))]))
-    heads = sym_dict["heads"]
-    nodes = sym_dict["nodes"]
-
-    if len(heads) != 1:
-        raise Exception("Only support single output model")
-    head_idx = heads[0][0]
-    # get linear classifier node of original model
-    classifier = _find_nodes_inputs(nodes[head_idx], arg_dict)
-    if len(classifier) != 1:
-        raise Exception("Only support single output model")
-
-    # get feature node from classifier node
-    feature = _find_nodes_inputs(nodes[classifier[0][0]], arg_dict)
-    if len(feature) != 1:
-        raise Exception("Only support single output model")
-
-    # make new symbol without classifier
-    new_nodes = nodes[:feature[0][0] + 1]
-    new_arg_nodes = [idx for idx in arg_nodes if idx < feature[0][0]]
-    new_sym = {"arg_nodes" : new_arg_nodes, "heads" : feature, "nodes":new_nodes}
-    return sym.load_json(json.dumps(new_sym))
-
-def finetune(model, num_new_output, **kwargs):
-    """Get a FeedForward model for fine-tune
-    .. note::
-        This function is not working with multiple outputs network
+        If top_layer is not present, it will return the second last layer symbol
 
     Parameters
     ----------
     model: mx.model.FeedForward
-        Model which contains parameters which will be used for fine-tune
-    num_new_output: int
-        New number of output category
+        Model will be used to extract feature symbol
+    top_layer: str, option
+        Name of top_layer will be used
+    """
+    internals = model.symbol.get_internals()
+    outputs = internals.list_outputs()[::-1]
+    if top_layer != None and type(top_layer) != str:
+        error_msg = "top_layer must be a string in following candidates:\n %s" % "\n".join(outputs)
+        raise TypeError(error_msg)
+    if top_layer == None:
+        last_name = ""
+        cnt = 0
+        for name in outputs:
+            if name.endswith("output"):
+                cnt += 1
+                last_name = name
+                if cnt == 3:
+                    break
+        return internals[last_name]
+    else:
+        if top_layer not in outputs:
+            error_msg = "%s not exists in symbol. Possible choice:\n%s" \
+                    % (top_layer, "\n".join(outputs))
+            raise ValueError(error_msg)
+        return internals[top_layer]
+
+def finetune(symbol, model, **kwargs):
+    """Get a FeedForward model for fine-tune
+
+    Parameters
+    ----------
+    symbol: mx.symbol.Symbol
+        Symbol of new network will be finetuned.
+    model: mx.model.FeedForward
+        Model which contains parameters which will be used for fine-tune.
     kwargs: kwargs
         mx.model.create function's parameter
     """
-    sym_json = model.symbol.tojson()
-    feature = _get_feature_symbol(sym_json)
-    classifier = sym.FullyConnected(feature, num_hidden=num_new_output)
-    classifier = sym.SoftmaxOutput(classifier, name="softmax")
-    initializer = Load(param=model.arg_params, default_init=Uniform(0.01))
-    new_model = FeedForward.create(symbol=classifier, initializer=initializer, **kwargs)
+    initializer = Load(param=model.arg_params, default_init=Uniform(0.001))
+    new_model = FeedForward.create(symbol=symbol, initializer=initializer, **kwargs)
     return new_model
