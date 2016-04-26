@@ -953,6 +953,8 @@ def get_feature_symbol(model, top_layer=None):
 
 def finetune(symbol, model, **kwargs):
     """Get a FeedForward model for fine-tune
+    .. note::
+        For layer doesn't exist in model, will be initialized as uniform random weight
 
     Parameters
     ----------
@@ -967,13 +969,31 @@ def finetune(symbol, model, **kwargs):
     -------
     new_model: mx.model.FeedForward
         Finetuned model
+
+    Examples
+    --------
+    Load a model
+    >>> sym, arg_params, aux_params = mx.model.load_checkpoint("model", 9)
+
+    Make new symbol for finetune
+
+    >>> feature = mx.model.get_feature_symbol(model)
+    >>> net = mx.sym.FullyConnected(data=feature, num_hidden=10, name="new_fc")
+    >>> net = mx.sym.SoftmaxOutput(data=net, name="softmax")
+
+    Finetune the model
+
+    >>> new_model = mx.model.finetune(symbol=net, model=model, num_epoch=2, learning_rate=1e-3,
+                                      X=train, eval_data=val,
+                                      batch_end_callback=mx.callback.Speedometer(100))
+
     """
     initializer = Load(param=model.arg_params, default_init=Uniform(0.001))
     new_model = FeedForward.create(symbol=symbol, initializer=initializer, **kwargs)
     return new_model
 
 
-def extractfeature(model, data, top_layer=None, **kwargs):
+def extract_feature(model, data, top_layer=None, **kwargs):
     """Extract feature from model
 
     Parameters
@@ -991,6 +1011,14 @@ def extractfeature(model, data, top_layer=None, **kwargs):
     --------
     pred: numpy.ndarray
         Extracted feature
+
+    Examples:
+    ---------
+    Load a model
+    >>> model = mx.model.FeedForward(symbol=sym, arg_params=arg_params, aux_params=aux_params)
+
+    Extract "fc1_output" feature for data_iter val
+    >>> fea = mx.model.extract_feature(model=model, data=val, top_layer="fc1_output")
 
     """
     fea_sym = get_feature_symbol(model, top_layer)
