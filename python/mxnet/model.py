@@ -931,26 +931,20 @@ def get_feature_symbol(model, top_layer=None):
         Name of top_layer will be used
     """
     internals = model.symbol.get_internals()
-    outputs = internals.list_outputs()[::-1]
+    tmp = internals.list_outputs()[::-1]
+    outputs = [name for name in tmp if name.endswith("output")]
     if top_layer != None and type(top_layer) != str:
         error_msg = "top_layer must be a string in following candidates:\n %s" % "\n".join(outputs)
         raise TypeError(error_msg)
     if top_layer == None:
-        last_name = ""
-        cnt = 0
-        for name in outputs:
-            if name.endswith("output"):
-                cnt += 1
-                last_name = name
-                if cnt == 3:
-                    break
-        return internals[last_name]
+        assert len(outputs) > 3
+        top_layer = outputs[2]
     else:
         if top_layer not in outputs:
             error_msg = "%s not exists in symbol. Possible choice:\n%s" \
                     % (top_layer, "\n".join(outputs))
             raise ValueError(error_msg)
-        return internals[top_layer]
+    return internals[top_layer]
 
 def finetune(symbol, model, **kwargs):
     """Get a FeedForward model for fine-tune
