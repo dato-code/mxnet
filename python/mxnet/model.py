@@ -929,6 +929,11 @@ def get_feature_symbol(model, top_layer=None):
         Model will be used to extract feature symbol
     top_layer: str, option
         Name of top_layer will be used
+
+    Returns
+    -------
+    internals[top_layer]: mx.symbol.Symbol
+        Feature symbol
     """
     internals = model.symbol.get_internals()
     tmp = internals.list_outputs()[::-1]
@@ -956,8 +961,43 @@ def finetune(symbol, model, **kwargs):
     model: mx.model.FeedForward
         Model which contains parameters which will be used for fine-tune.
     kwargs: kwargs
-        mx.model.create function's parameter
+        mx.model.create function's parameters
+
+    Returns
+    -------
+    new_model: mx.model.FeedForward
+        Finetuned model
     """
     initializer = Load(param=model.arg_params, default_init=Uniform(0.001))
     new_model = FeedForward.create(symbol=symbol, initializer=initializer, **kwargs)
     return new_model
+
+
+def extractfeature(model, data, top_layer=None, **kwargs):
+    """Extract feature from model
+
+    Parameters
+    ----------
+    model: mx.model.FeedForward
+        Model which contains parameters which will be used for fine-tune.
+    data: mx.io.DataIter or numpy array
+        Data iter or numpy array to be extracted
+    top_layer: str, optional
+        Layer which will be extracted. If not set, will extract the second last layer
+    kwargs: kwargs
+        mx.model.FeedForward class' parameters
+
+    Returns:
+    --------
+    pred: numpy.ndarray
+        Extracted feature
+
+    """
+    fea_sym = get_feature_symbol(model, top_layer)
+    mdl = FeedForward(symbol=fea_sym,
+                      arg_params=model.arg_params,
+                      aux_params=model.aux_params,
+                      allow_extra_params=True,
+                      **kwargs)
+    pred =  mdl.predict(data)
+    return pred
