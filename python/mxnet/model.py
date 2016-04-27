@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import numpy as np
 import time
 import logging
+import json
 from . import io
 from . import nd
 from . import symbol as sym
@@ -13,7 +14,7 @@ from . import optimizer as opt
 from . import metric
 from . import kvstore as kvs
 from .context import Context, cpu
-from .initializer import Uniform
+from .initializer import Uniform, Load, Xavier
 from collections import namedtuple
 from .optimizer import get_updater
 from .executor_manager import DataParallelExecutorManager, _check_arguments, _load_data
@@ -922,3 +923,115 @@ class FeedForward(BASE_ESTIMATOR):
                   work_load_list=work_load_list,
                   eval_batch_end_callback=eval_batch_end_callback)
         return model
+
+def get_feature_symbol(model, top_layer=None):
+    """Get feature symbol from a model
+    .. note::
+        If top_layer is not present, it will return the second last layer symbol
+
+    Parameters
+    ----------
+    model: mx.model.FeedForward
+        Model will be used to extract feature symbol
+    top_layer: str, option
+        Name of top_layer will be used
+
+    Returns
+    -------
+    internals[top_layer]: mx.symbol.Symbol
+        Feature symbol
+    """
+    internals = model.symbol.get_internals()
+    tmp = internals.list_outputs()[::-1]
+    outputs = [name for name in tmp if name.endswith("output")]
+    if top_layer != None and type(top_layer) != str:
+        error_msg = "top_layer must be a string in following candidates:\n %s" % "\n".join(outputs)
+        raise TypeError(error_msg)
+    if top_layer == None:
+        assert len(outputs) > 3
+        top_layer = outputs[2]
+    else:
+        if top_layer not in outputs:
+            error_msg = "%s not exists in symbol. Possible choice:\n%s" \
+                    % (top_layer, "\n".join(outputs))
+            raise ValueError(error_msg)
+    return internals[top_layer]
+
+def finetune(symbol, model, **kwargs):
+    """Get a FeedForward model for fine-tune
+    .. note::
+        For layer doesn't exist in model, will be initialized as uniform random weight
+
+    Parameters
+    ----------
+    symbol: mx.symbol.Symbol
+        Symbol of new network will be finetuned.
+    model: mx.model.FeedForward
+        Model which contains parameters which will be used for fine-tune.
+    kwargs: kwargs
+        mx.model.create function's parameters
+
+    Returns
+    -------
+    new_model: mx.model.FeedForward
+        Finetuned model
+
+    Examples
+    --------
+    Load a model
+    >>> sym, arg_params, aux_params = mx.model.load_checkpoint("model", 9)
+
+    Make new symbol for finetune
+
+    >>> feature = mx.model.get_feature_symbol(model)
+    >>> net = mx.sym.FullyConnected(data=feature, num_hidden=10, name="new_fc")
+    >>> net = mx.sym.SoftmaxOutput(data=net, name="softmax")
+
+    Finetune the model
+
+    >>> new_model = mx.model.finetune(symbol=net, model=model, num_epoch=2, learning_rate=1e-3,
+                                      X=train, eval_data=val,
+                                      batch_end_callback=mx.callback.Speedometer(100))
+
+    """
+    initializer = Load(param=model.arg_params, default_init=Uniform(0.001))
+    new_model = FeedForward.create(symbol=symbol, initializer=initializer, **kwargs)
+    return new_model
+
+
+def extract_feature(model, data, top_layer=None, **kwargs):
+    """Extract feature from model
+
+    Parameters
+    ----------
+    model: mx.model.FeedForward
+        Model which contains parameters which will be used for fine-tune.
+    data: mx.io.DataIter or numpy array
+        Data iter or numpy array to be extracted
+    top_layer: str, optional
+        Layer which will be extracted. If not set, will extract the second last layer
+    kwargs: kwargs
+        mx.model.FeedForward class' parameters
+
+    Returns:
+    --------
+    pred: numpy.ndarray
+        Extracted feature
+
+    Examples:
+    ---------
+    Load a model
+    >>> model = mx.model.FeedForward(symbol=sym, arg_params=arg_params, aux_params=aux_params)
+
+    Extract "fc1_output" feature for data_iter val
+    >>> fea = mx.model.extract_feature(model=model, data=val, top_layer="fc1_output")
+
+    """
+    fea_sym = get_feature_symbol(model, top_layer)
+    mdl = FeedForward(symbol=fea_sym,
+                      arg_params=model.arg_params,
+                      aux_params=model.aux_params,
+                      allow_extra_params=True,
+                      **kwargs)
+    pred =  mdl.predict(data)
+    return pred
