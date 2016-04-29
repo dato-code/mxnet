@@ -563,6 +563,16 @@ MXNET_DLL int MXSymbolCopy(SymbolHandle symbol, SymbolHandle *out);
  */
 MXNET_DLL int MXSymbolPrint(SymbolHandle symbol, const char **out_str);
 /*!
+ * \brief Get string name from symbol
+ * \param symbol the source symbol
+ * \param out The result name.
+ * \param success Whether the result is contained in out.
+ * \return 0 when success, -1 when failure happens
+ */
+MXNET_DLL int MXSymbolGetName(SymbolHandle symbol,
+                              const char** out,
+                              int *success);
+/*!
  * \brief Get string attribute from symbol
  * \param symbol the source symbol
  * \param key The key of the symbol.
@@ -593,6 +603,16 @@ MXNET_DLL int MXSymbolGetAttr(SymbolHandle symbol,
 MXNET_DLL int MXSymbolSetAttr(SymbolHandle symbol,
                               const char* key,
                               const char* value);
+/*!
+ * \brief Get all attributes from symbol
+ * \param symbol the source symbol
+ * \param out_size The number of output attributes
+ * \param out 2*out_size strings representing key value pairs.
+ * \return 0 when success, -1 when failure happens
+ */
+MXNET_DLL int MXSymbolListAttr(SymbolHandle symbol,
+                               mx_uint *out_size,
+                               const char*** out);
 /*!
  * \brief List arguments in the symbol.
  * \param symbol the symbol
@@ -1032,8 +1052,17 @@ MXNET_DLL int MXDataIterGetPadNum(DataIterHandle handle,
 MXNET_DLL int MXDataIterGetLabel(DataIterHandle handle,
                                  NDArrayHandle *out);
 //--------------------------------------------
-// Part 5: basic KVStore interface
+// Part 6: basic KVStore interface
 //--------------------------------------------
+/*!
+ * \brief Initialized ps-lite environment variables
+ * \param num_vars number of variables to initialize
+ * \param keys environment keys
+ * \param vals environment values
+ */
+MXNET_DLL int MXInitPSEnv(mx_uint num_vars,
+                          const char **keys,
+                          const char **vals);
 /*!
  * \brief Create a kvstore
  * \param type the type of KVStore

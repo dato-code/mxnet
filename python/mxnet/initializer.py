@@ -42,6 +42,8 @@ class Initializer(object):
         elif name.endswith("moving_mean"):
             self._init_zero(name, arr)
         elif name.endswith("moving_var"):
+            self._init_one(name, arr)
+        elif name.endswith("moving_inv_var"):
             self._init_zero(name, arr)
         elif name.endswith("moving_inv_var"):
             self._init_zero(name, arr)
@@ -63,6 +65,9 @@ class Initializer(object):
 
     def _init_zero(self, _, arr):
         arr[:] = 0.0
+
+    def _init_one(self, _, arr):
+        arr[:] = 1.0
 
     def _init_bias(self, _, arr):
         arr[:] = 0.0

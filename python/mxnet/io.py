@@ -28,11 +28,19 @@ class DataBatch(object):
         self.pad = pad
         self.index = index
 
+class DataBatch(object):
+    """Default object for holding a mini-batch of data and related information."""
+    def __init__(self, data, label, pad, index,
+                 bucket_key=None, provide_data=None, provide_label=None):
+        self.data = data
+        self.label = label
+        self.pad = pad
+        self.index = index
+
         # the following properties are only used when bucketing is used
         self.bucket_key = bucket_key
         self.provide_data = provide_data
         self.provide_label = provide_label
-
 
 class DataIter(object):
     """DataIter object in mxnet. """
@@ -102,7 +110,8 @@ class DataIter(object):
         pass
 
     def getindex(self):
-        """
+        """Get index of the current batch.
+
         Returns
         -------
         index : numpy.array
@@ -178,8 +187,6 @@ class PrefetchingIter(DataIter):
     """Base class for prefetching iterators. Takes one or more DataIters (
     or any class with "reset" and "read" methods) and combine them with
     prefetching. For example:
-    iter = PrefetchingIter([NDArrayIter({'data': X1}), NDArrayIter({'data': X2})],
-                           rename_data=[{'data': 'data1'}, {'data': 'data2'}])
 
     Parameters
     ----------
@@ -191,6 +198,11 @@ class PrefetchingIter(DataIter):
         in iter[i].provide_data
     rename_label : None or list of dict
         Similar to rename_data
+
+    Examples
+    --------
+    iter = PrefetchingIter([NDArrayIter({'data': X1}), NDArrayIter({'data': X2})],
+                           rename_data=[{'data': 'data1'}, {'data': 'data2'}])
     """
     def __init__(self, iters, rename_data=None, rename_label=None):
         super(PrefetchingIter, self).__init__()

@@ -1,4 +1,4 @@
-# pylint: disable=too-many-arguments, too-many-locals
+# pylint: disable=too-many-arguments, too-many-locals, too-many-public-methods
 """`BaseModule` defines an API for modules."""
 
 import logging
@@ -46,16 +46,21 @@ class BaseModule(object):
       (forward-backward).
 
     In order for a module to interactive with others, a module should be able to report the
-    following information (after binded).
+    following information in its raw stage (before binded)
+
+    - `data_names`: list of string indicating the names of required data.
+    - `output_names`: list of string indicating the names of required outputs.
+
+    And also the following richer information after binded:
 
     - state information
         - `binded`: `bool`, indicating whether the memory buffers needed for computation
-           has been allocated.
+          has been allocated.
         - `for_training`: whether the module is binded for training (if binded).
         - `params_initialized`: `bool`, indicating whether the parameters of this modules
-           has been initialized.
+          has been initialized.
         - `optimizer_initialized`: 'bool`, indicating whether an optimizer is defined
-           and initialized.
+          and initialized.
         - `inputs_need_grad`: `bool`, indicating whether gradients with respect to the
           input data is needed. Might be useful when implementing composition of modules.
 
@@ -167,6 +172,37 @@ class BaseModule(object):
                 for callback in _as_list(batch_end_callback):
                     callback(batch_end_params)
 
+    def iter_predict(self, eval_data, num_batch=None, reset=True):
+        """Iterate over predictions.
+
+            for pred, i_batch, batch in module.iter_predict(eval_data):
+                # pred is a list of outputs from the module
+                # i_batch is a integer
+                # batch is the data batch from the data iterator
+
+        Parameters
+        ----------
+        eval_data : DataIter
+        num_batch : int
+            Default is `None`, indicating running all the batches in the data iterator.
+        reset : bool
+            Default is `True`, indicating whether we should reset the data iter before start
+            doing prediction.
+        """
+        assert self.binded and self.params_initialized
+
+        if reset:
+            eval_data.reset()
+
+        for nbatch, eval_batch in enumerate(eval_data):
+            if num_batch is not None and nbatch == num_batch:
+                break
+            self.forward(eval_batch, is_train=False)
+            pad = eval_batch.pad
+            outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()]
+
+            yield (outputs, nbatch, eval_batch)
+
     def predict(self, eval_data, num_batch=None, merge_batches=True, reset=True,
                 always_output_list=False):
         """Run prediction and collect the outputs.
@@ -175,7 +211,7 @@ class BaseModule(object):
         ----------
         eval_data : DataIter
         num_batch : int
-            Default is `None`, indicating run all the batches in the data iterator.
+            Default is `None`, indicating running all the batches in the data iterator.
         merge_batches : bool
             Default is `True`, see the doc for return values.
         reset : bool
@@ -209,6 +245,7 @@ class BaseModule(object):
             self.forward(eval_batch, is_train=False)
             pad = eval_batch.pad
             outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()]
+
             output_list.append(outputs)
 
         if len(output_list) == 0:
@@ -335,6 +372,19 @@ class BaseModule(object):
 
             # end of 1 epoch, reset the data-iter for another epoch
             train_data.reset()
+
+    ################################################################################
+    # Symbol information
+    ################################################################################
+    @property
+    def data_names(self):
+        """A list of names for data required by this module."""
+        raise NotImplementedError()
+
+    @property
+    def output_names(self):
+        """A list of names for the outputs of this module."""
+        raise NotImplementedError()
 
     ################################################################################
     # Input/Output information
