@@ -5,8 +5,6 @@
  * \author Bing Xu
 */
 
-#include <graphlab/sdk/gl_sframe.hpp>
-#include <graphlab/sdk/gl_sarray.hpp>
 #include <mxnet/io.h>
 #include <dmlc/base.h>
 #include <dmlc/io.h>
