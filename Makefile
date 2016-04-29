@@ -98,7 +98,7 @@ endif
 
 # SFrame flexible_type
 FLEXIBLE_TYPE = $(ROOTDIR)/flexible_type
-LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a 
+LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a
 LDFLAGS += -lpng -ljpeg -lz
 
 # plugins
@@ -139,7 +139,7 @@ else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S), Darwin)
 		SCALA_PKG_PROFILE := osx-x86_64
-	else     
+	else
 		SCALA_PKG_PROFILE := linux-x86_64
 	endif
 endif
@@ -149,7 +149,6 @@ LIB_DEP += $(DMLC_CORE)/libdmlc.a
 ALL_DEP = $(OBJ) $(EXTRA_OBJ) $(PLUGIN_OBJ) $(LIB_DEP)
 ifeq ($(USE_CUDA), 1)
 	ALL_DEP += $(CUOBJ) $(EXTRA_CUOBJ) $(PLUGIN_CUOBJ)
-	LDFLAGS += -lcuda
 	SCALA_PKG_PROFILE := $(SCALA_PKG_PROFILE)-gpu
 else
 	SCALA_PKG_PROFILE := $(SCALA_PKG_PROFILE)-cpu
