@@ -33,7 +33,6 @@ class DataBatch(object):
         self.provide_data = provide_data
         self.provide_label = provide_label
 
-
 class DataIter(object):
     """DataIter object in mxnet. """
 
@@ -102,7 +101,8 @@ class DataIter(object):
         pass
 
     def getindex(self):
-        """
+        """Get index of the current batch.
+
         Returns
         -------
         index : numpy.array
@@ -177,9 +177,7 @@ class ResizeIter(DataIter):
 class PrefetchingIter(DataIter):
     """Base class for prefetching iterators. Takes one or more DataIters (
     or any class with "reset" and "read" methods) and combine them with
-    prefetching. For example:
-    iter = PrefetchingIter([NDArrayIter({'data': X1}), NDArrayIter({'data': X2})],
-                           rename_data=[{'data': 'data1'}, {'data': 'data2'}])
+    prefetching.
 
     Parameters
     ----------
@@ -191,6 +189,11 @@ class PrefetchingIter(DataIter):
         in iter[i].provide_data
     rename_label : None or list of dict
         Similar to rename_data
+
+    Examples
+    --------
+    >>> iter = PrefetchingIter([NDArrayIter({'data': X1}), NDArrayIter({'data': X2})],
+    ...                        rename_data=[{'data': 'data1'}, {'data': 'data2'}])
     """
     def __init__(self, iters, rename_data=None, rename_label=None):
         super(PrefetchingIter, self).__init__()
@@ -457,9 +460,9 @@ class SFrameIter(DataIter):
     data_field : string or list(string)
         data fields of the SFrame. The seleted fields may be either a single image typed column,
         or multiple numerical columns (int, float, array).
-    label_field : string (optional)
+    label_field : string, optional
         label field in SFrame
-    batch_size : int
+    batch_size : int, optional
         batch size
 
     Examples
@@ -615,6 +618,95 @@ class SFrameIter(DataIter):
 
     def getpad(self):
         return self.pad
+
+
+class SFrameImageIter(SFrameIter):
+    """Image Data Iterator from SFrame
+    Provide the SFrameIter like interface with options to normalize and augment image data.
+
+    Parameters
+    ----------
+    sframe : SFrame object
+        source SFrame
+    data_field : string
+        image data field of the SFrame.
+    label_field : string, optional
+        label field in SFrame
+    batch_size : int, optional
+        batch size
+    mean_r : float, optional
+        normalize the image by subtracting the mean value of r channel, or the first channel for
+    mean_g : float, optional
+        normalize the image by subtracting the mean value of g channel
+    mean_b : float, optional
+        normalize the image by subtracting the mean value of b channel
+    scale : float, optional
+        multiply each pixel value by the scale (this operation is performed after mean subtraction)
+    **kwargs :
+        placeholder for new parameters
+
+    Examples
+    --------
+    >>> import sframe as sf
+    >>> import mxnet as mx
+
+    >>> image_data = sf.SFrame('http://s3.amazonaws.com/dato-datasets/mnist/sframe/train')
+    >>> image_data_iter = mx.io.SFrameImageIter(sframe=data, data_field=['image'], label_field='label', batch_size=100,
+                                                mean_r=117, scale=0.5)
+
+    Notes
+    -----
+    - Image column must contain images of the same size.
+    """
+
+    def __init__(self, sframe, data_field, label_field=None, batch_size=1,
+                 data_name='data', label_name='softmax_label',
+                 mean_r=0.0,
+                 mean_g=0.0,
+                 mean_b=0.0,
+                 scale=1.0,
+                 **kwargs):
+        super(SFrameImageIter, self).__init__(sframe, data_field, label_field, batch_size,
+                                              data_name, label_name)
+
+        # Mean subtraction parameters
+        self._rgb_mask = np.zeros(self.data_shape)
+        nchannels = self.data_shape[1]
+        mean_per_channel = [mean_r, mean_g, mean_b][:nchannels]
+        for i in range(nchannels):
+            self._rgb_mask[:, i, :, :] = mean_per_channel[i]
+        self._rgb_mask = array(self._rgb_mask)
+
+        # Rescale parameters
+        self._scale = scale
+
+    def _type_check(self, sframe, data_field, label_field):
+        if label_field is not None:
+            label_column_type = sframe[label_field].dtype()
+            if label_column_type not in [int, float]:
+                raise TypeError('Unexpected type for label_field \"%s\". Expect int or float, got %s' %
+                                (label_field, str(label_column_type)))
+        for col in data_field:
+            col_type = sframe[col].dtype()
+            if col_type not in [gl.Image]:
+                raise TypeError('Unexpected type for data_field \"%s\". Expect or image, got %s' %
+                               (col, str(col_type)))
+
+    def _infer_column_shape(self, sarray):
+        dtype = sarray.dtype()
+        if not dtype is gl.Image:
+            raise TypeError('Data column must be image type')
+
+        first_image = sarray.head(1)[0]
+        if first_image is None:
+            raise ValueError('Column cannot contain missing value')
+        return (first_image.channels, first_image.height, first_image.width)
+
+    def iter_next(self):
+        ret = super(self.__class__, self).iter_next()
+        # Postprocess: normalize by mean, scale, ...
+        self.data_ndarray = (self.data_ndarray - self._rgb_mask) * self._scale
+        return ret
 
 
 class MXDataIter(DataIter):
