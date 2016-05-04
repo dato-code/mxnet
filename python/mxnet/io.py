@@ -640,6 +640,10 @@ class SFrameImageIter(SFrameIter):
         normalize the image by subtracting the mean value of g channel
     mean_b : float, optional
         normalize the image by subtracting the mean value of b channel
+    mean_nd : np.ndarray, optional
+        normalize the image by subtracting the ndarray of mean pixel values.
+        The mean_nd array stores the pixel values in the order of [height, width, channel]
+        This option will surpress mean_r, mean_g, and mean_b.
     scale : float, optional
         multiply each pixel value by the scale (this operation is performed after mean subtraction)
     **kwargs :
@@ -664,6 +668,7 @@ class SFrameImageIter(SFrameIter):
                  mean_r=0.0,
                  mean_g=0.0,
                  mean_b=0.0,
+                 mean_nd=None,
                  scale=1.0,
                  **kwargs):
         super(SFrameImageIter, self).__init__(sframe, data_field, label_field, batch_size,
@@ -671,10 +676,21 @@ class SFrameImageIter(SFrameIter):
 
         # Mean subtraction parameters
         self._rgb_mask = np.zeros(self.data_shape)
-        nchannels = self.data_shape[1]
-        mean_per_channel = [mean_r, mean_g, mean_b][:nchannels]
-        for i in range(nchannels):
-            self._rgb_mask[:, i, :, :] = mean_per_channel[i]
+        if mean_nd is None:
+            nchannels = self.data_shape[1]
+            mean_per_channel = [mean_r, mean_g, mean_b][:nchannels]
+            for i in range(nchannels):
+                self._rgb_mask[:, i, :, :] = mean_per_channel[i]
+        elif type(mean_nd) == np.ndarray:
+            mean_nd = np.swapaxes(mean_nd, 0, 2) # h, w, c -> c, w, h
+            mean_nd = np.swapaxes(mean_nd, 1, 2) # c, w, h -> c, h, w
+            if mean_nd.shape == self.data_shape[1:]:
+                for i in range(self.data_shape[0]):
+                    self._rgb_mask[i,:] = mean_nd
+            else:
+                raise ValueError('Shape mismatch. mean_nd has different shape from input image')
+        else:
+            raise TypeError('mean_nd must be type np.ndarray or mxnet.ndarray.array')
         self._rgb_mask = array(self._rgb_mask)
 
         # Rescale parameters

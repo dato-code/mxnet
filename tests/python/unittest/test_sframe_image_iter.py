@@ -21,7 +21,7 @@ except:
 @unittest.skipIf(__has_sframe__ is False and __has_graphlab__ is False, 'graphlab or sframe not found')
 class SFrameImageIteratorBaseTest(unittest.TestCase):
     def setUp(self):
-        (w, h, c, n) = (6, 8, 3, 10)
+        (w, h, c, n) = (2, 4, 3, 10)
         self.images = [np.random.randint(256, size=(h,w,c)) for i in range(n)]
         self.data = gl.SFrame({'arr': [array.array('d', x.flatten()) for x in self.images],
                               'y': np.random.randint(2, size=n)})
@@ -64,7 +64,6 @@ class SFrameImageIteratorBaseTest(unittest.TestCase):
                                  label_field=self.label_field,
                                  batch_size=self.data_size,
                                  mean_r=mean_r, mean_g=mean_g, mean_b=mean_b, scale=scale)
-        label_actual = []
         data_actual = []
         for d in it:
             # reorder from (batch, channel, height, width) to (batch, height, width, channel)
@@ -76,6 +75,25 @@ class SFrameImageIteratorBaseTest(unittest.TestCase):
             x[:,:,:,1] += mean_g
             x[:,:,:,2] += mean_b
             data_actual.extend(x.flatten())
-            label_actual.extend(d.label[0].asnumpy().flatten())
-        np.testing.assert_almost_equal(label_actual, self.label_expected)
+        np.testing.assert_almost_equal(data_actual, self.data_expected)
+
+        mean_nd = self.images[0]
+        mean_nd[:,:,0] = mean_r
+        mean_nd[:,:,1] = mean_g
+        mean_nd[:,:,2] = mean_b
+        it = mxnet.io.SFrameImageIter(self.data, data_field=self.data_field,
+                                 label_field=self.label_field,
+                                 batch_size=self.data_size,
+                                 mean_nd=mean_nd, scale=scale)
+        data_actual = []
+        for d in it:
+            # reorder from (batch, channel, height, width) to (batch, height, width, channel)
+            x = d.data[0].asnumpy()
+            x = np.swapaxes(x, 1, 3)
+            x = np.swapaxes(x, 1, 2)
+            x[:] /= scale
+            x[:,:,:,0] += mean_r
+            x[:,:,:,1] += mean_g
+            x[:,:,:,2] += mean_b
+            data_actual.extend(x.flatten())
         np.testing.assert_almost_equal(data_actual, self.data_expected)
