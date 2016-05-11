@@ -26,6 +26,7 @@
 #include <utility>
 #include "./c_api_error.h"
 #include "../common/thread_local.h"
+#include "../operator/custom-inl.h"
 
 using namespace mxnet;
 
@@ -1031,7 +1032,7 @@ int MXExecutorBindEX(SymbolHandle symbol_handle,
                      mx_uint *grad_req_type,
                      mx_uint aux_states_len,
                      NDArrayHandle *aux_states,
-                     ExecutorHandle *shared_exec,
+                     ExecutorHandle shared_exec,
                      ExecutorHandle *out) {
   API_BEGIN();
   Symbol *symb = static_cast<Symbol*>(symbol_handle);
@@ -1520,5 +1521,11 @@ int MXOptimizerUpdate(OptimizerHandle handle,
               static_cast<NDArray*>(weight),
               static_cast<NDArray*>(grad),
               lr, wd);
+  API_END();
+}
+
+int MXCustomOpRegister(const char* op_type, CustomOpPropCreator creator) {
+  API_BEGIN();
+  mxnet::op::CustomOpProp::Register(op_type, creator);
   API_END();
 }
