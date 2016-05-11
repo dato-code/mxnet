@@ -56,6 +56,8 @@ function print_help {
   echo
   echo "  --cuda_path             Cuda library path. If specified, mxnet will be built with cuda support"
   echo 
+  echo "  --cudnn_path            Cudnn library path. If specified, mxnet will be built with cudnn support"
+  echo 
   echo "  -D var=value            Specify CFLAGS definitions to be passed on to cmake."
   echo 
   echo "Configure with either default toolchain, or an existing toolchain if there is one."
@@ -139,6 +141,7 @@ toolchain=""
 default_yes=0
 no_cuda=1 # we don't need cuda from dato-deps
 cuda_path=""
+cudnn_path=""
 
 # Parse command line configure flags ------------------------------------------
 while [ $# -gt 0 ]
@@ -147,6 +150,7 @@ while [ $# -gt 0 ]
     --cleanup)              cleanup_option=1;;
     --cleanup_if_invalid)   cleanup_if_invalid_option=1;;
     --cuda_path=*)          cuda_path=${1##--cuda_path=};;
+    --cudnn_path=*)         cudnn_path=${1##--cudnn_path=};;
     --yes)                  default_yes=1;;
     --help)                 print_help ;;
     -D)                     CFLAGS="$CFLAGS -D $2"; shift ;;
@@ -259,6 +263,7 @@ elif [[ $OSTYPE == msys ]]; then
 fi
 
 USE_CUDA_PATH=${cuda_path}
+USE_CUDNN_PATH=${cudnn_path}
 # CUDA Flags
 if [ -z "$USE_CUDA_PATH" ]; then
   USE_CUDA_PATH=NONE
@@ -266,6 +271,12 @@ if [ -z "$USE_CUDA_PATH" ]; then
 else
   USE_CUDA=1
   SHARED_LINKER_FLAGS+=" -Wl,-rpath,${USE_CUDA_PATH}/lib64"
+  if [ ! -z "$USE_CUDNN_PATH" ]; then
+    USE_CUDNN=1
+    SHARED_LINKER_FLAGS+=" -Wl,-rpath,${USE_CUDA_PATH}/lib64"
+    ADD_CFLAGS+=" -I${USE_CUDNN_PATH}/include"
+    ADD_LDFLAGS+=" -L${USE_CUDA_PATH}/lib"
+  fi
 fi
 
 DEPS=$PWD/deps/local

@@ -52,7 +52,7 @@ USE_CUDA = ${USE_CUDA}
 USE_CUDA_PATH = ${USE_CUDA_PATH}
 
 # whether use CUDNN R3 library
-USE_CUDNN = 0
+USE_CUDNN = ${USE_CUDNN}
 
 # whether use cuda runtime compiling for writing kernels in native language (i.e. Python)
 USE_NVRTC = 0

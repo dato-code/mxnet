@@ -37,6 +37,17 @@ make -j4
 echo "==================================="
 }
 
+## Build with cudnn
+function build_with_cudnn {
+echo "============= Build with CUDNN =============="
+echo "CUDA path: ${CUDA_PATH}"
+echo "CUDNN path: ${CUDNN_PATH}"
+./configure --cleanup_if_invalid --yes --cuda_path=${CUDA_PATH} --cudnn_path=${CUDNN_PATH}
+make clean_all
+make -j4
+echo "==================================="
+}
+
 ## Test
 function unittest {
 echo "============= UnitTest =============="
@@ -130,14 +141,24 @@ unittest
 LIB_NAME='libmxnet'
 copy_artifact
 
-## GPU build ##
+## CUDA build ##
 if [[ ! -z "$CUDA_PATH" ]]; then
   build_with_cuda
+  LIB_NAME='libmxnet.cuda'
+  copy_artifact
   if [[ ! -z "$TEST_GPU" ]]; then
     unittest_with_cuda
   fi
-  LIB_NAME='libmxnet.cuda'
+fi
+
+## CUDNN build ##
+if [[ ! -z "$CUDNN_PATH" ]]; then
+  build_with_cudnn
+  LIB_NAME='libmxnet.cudnn'
   copy_artifact
+  if [[ ! -z "$TEST_GPU" ]]; then
+    unittest_with_cuda
+  fi
 fi
 
 package

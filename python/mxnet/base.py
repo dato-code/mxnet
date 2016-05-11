@@ -36,19 +36,24 @@ def _load_lib():
     """Load libary by searching possible path."""
     lib_path = libinfo.find_lib_path()[0]
     cuda_lib_path = lib_path.replace('libmxnet.', 'libmxnet.cuda.')
-    if os.path.exists(cuda_lib_path):
+    cudnn_lib_path = lib_path.replace('libmxnet.', 'libmxnet.cudnn.')
+    if os.path.exists(cudnn_lib_path):
         try:
-            lib = ctypes.cdll.LoadLibrary(cuda_lib_path)
-            __LOGGER__.info("CUDA GPU support is activated")
+            lib = ctypes.cdll.LoadLibrary(cudnn_lib_path)
+            __LOGGER__.info("CUDA and cuDNN support is activated")
         except Exception as e:
-            __LOGGER__.warn("Unable to load CUDA library. Error: %s" % e)
-            __LOGGER__.info("MXNet requires CUDA Toolkit v7.0. Please make sure the proper CUDA toolkit and driver is installed and LD_LIBRARY_PATH is exported")
-            __LOGGER__.info("GPU support is disabled")
-            lib = ctypes.cdll.LoadLibrary(lib_path)
+            try:
+                lib = ctypes.cdll.LoadLibrary(cuda_lib_path)
+                __LOGGER__.info("CUDA support is activated without cuDNN")
+            except Exception as e:
+                __LOGGER__.warn("Unable to load CUDA library. Error: %s" % e)
+                __LOGGER__.info("MXNet requires CUDA Toolkit v7.5. Please make sure the proper version of CUDA toolkit and driver is installed and LD_LIBRARY_PATH is exported")
+                __LOGGER__.info("GPU support is disabled")
+                lib = ctypes.cdll.LoadLibrary(lib_path)
     else:
         __LOGGER__.info("CUDA support is currently not available on this platform. GPU support is disabled.")
         lib = ctypes.cdll.LoadLibrary(lib_path)
-    # DMatrix functions
+
     lib.MXGetLastError.restype = ctypes.c_char_p
     return lib
 
