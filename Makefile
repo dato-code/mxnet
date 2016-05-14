@@ -39,9 +39,9 @@ endif
 CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
 ifeq ($(DEBUG), 1)
-	NVCCFLAGS = -g -G -O0 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
+	NVCCFLAGS = -D_FORCE_INLINES -g -G -O0 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 else
-	NVCCFLAGS = --use_fast_math -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
+	NVCCFLAGS = -D_FORCE_INLINES -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 endif
 
 ifndef ROOTDIR
@@ -228,7 +228,7 @@ lint: rcpplint jnilint
 doc: doxygen
 
 doxygen:
-	doxygen doc/Doxyfile
+	doxygen docs/Doxyfile
 
 # R related shortcuts
 rcpplint:
