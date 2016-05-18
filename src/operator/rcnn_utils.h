@@ -190,7 +190,7 @@ namespace mxnet {
 namespace op {
 namespace utils {
 
-inline void _mk_anchor(float w,
+inline void _Make_anchor(float w,
                        float h,
                        float x_ctr,
                        float y_ctr,
@@ -201,20 +201,20 @@ inline void _mk_anchor(float w,
   (*out_anchors)[3] = y_ctr + 0.5*(h - 1);
 }
 
-inline void _transform(float scale,
-                      float ratio,
-                      const Tensor<cpu, 1>& base_anchor,
-                      Tensor<cpu, 1> *out_anchor) {
+inline void _Transform(float scale,
+                       float ratio,
+                       const Tensor<cpu, 1>& base_anchor,
+                       Tensor<cpu, 1> *out_anchor) {
   float w = base_anchor[2] - base_anchor[1] + 1;
   float h = base_anchor[3] - base_anchor[1] + 1;
   float x_ctr = base_anchor[0] + 0.5 * (w-1);
   float y_ctr = base_anchor[1] + 0.5 * (h-1);
   float size = w * h;
   float size_ratios = size/ratio;
-  float new_w = std::round(std::sqrt(size_ratios))*scale;
+  float new_w = std::round(std::sqrt(size_ratios)) * scale;
   float new_h = std::round(new_w * ratio);
 
-  _mk_anchor(new_w, new_h, x_ctr,
+  _Make_anchor(new_w, new_h, x_ctr,
              y_ctr, out_anchor);
 }
 
@@ -224,11 +224,11 @@ inline void  generate_anchors(const Tensor<cpu, 1>& base_anchor,
                               const std::vector<float>& scales,
                               Tensor<cpu, 2>* out_anchors) {
   size_t i = 0;
-  for (auto const& ratio : ratios) {
-    for (auto const& scale : scales) {
+  for (size_t j = 0; j < ratios.size(); ++j) {
+    for (size_t k = 0; k < ratios.size(); ++k) {
       Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
-      _transform(scale, ratio, base_anchor, &out_anchor);
-      i++;
+      _Transform(scale, ratio, base_anchor, &out_anchor);
+      ++i;
     }
   }
 }
