@@ -190,7 +190,7 @@ namespace mxnet {
 namespace op {
 namespace utils {
 
-inline void _Make_anchor(float w,
+inline void _MakeAnchor(float w,
                        float h,
                        float x_ctr,
                        float y_ctr,
@@ -214,15 +214,17 @@ inline void _Transform(float scale,
   float new_w = std::round(std::sqrt(size_ratios)) * scale;
   float new_h = std::round(new_w * ratio);
 
-  _Make_anchor(new_w, new_h, x_ctr,
+  _MakeAnchor(new_w, new_h, x_ctr,
              y_ctr, out_anchor);
 }
 
 // out_anchors must have shape (n,4), where n is ratios.size() * scales.size()
-inline void  generate_anchors(const Tensor<cpu, 1>& base_anchor,
+inline void  GenerateAnchors(const Tensor<cpu, 1>& base_anchor,
                               const std::vector<float>& ratios,
                               const std::vector<float>& scales,
                               Tensor<cpu, 2>* out_anchors) {
+  CHECK_EQ(out_anchors->size(0), ratios.size() * scales.size());
+  CHECK_EQ(out_anchors->size(1), 4);
   size_t i = 0;
   for (size_t j = 0; j < ratios.size(); ++j) {
     for (size_t k = 0; k < scales.size(); ++k) {
