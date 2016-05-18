@@ -225,7 +225,7 @@ inline void  generate_anchors(const Tensor<cpu, 1>& base_anchor,
                               Tensor<cpu, 2>* out_anchors) {
   size_t i = 0;
   for (size_t j = 0; j < ratios.size(); ++j) {
-    for (size_t k = 0; k < ratios.size(); ++k) {
+    for (size_t k = 0; k < scales.size(); ++k) {
       Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
       _Transform(scale, ratio, base_anchor, &out_anchor);
       ++i;
