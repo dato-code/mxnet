@@ -6,8 +6,6 @@
 */
 #ifndef MXNET_OPERATOR_RCNN_UTILS_H_
 #define MXNET_OPERATOR_RCNN_UTILS_H_
-#include <map>
-#include <string>
 #include <algorithm>
 #include <mshadow/tensor.h>
 #include <mshadow/extension.h>
@@ -192,91 +190,47 @@ namespace mxnet {
 namespace op {
 namespace utils {
 
-inline void _mk_anchors(const mshadow::Tensor<cpu, 1>& ws,
-                const mshadow::Tensor<cpu, 1>& hs,
-                float x_ctr,
-                float y_ctr,
-                size_t offset,
-                mshadow::Tensor<cpu, 2> *out_anchors) {
-  size_t num_anchors = ws.size(0);
-  for (size_t i = 0; i < num_anchors; i++) {
-    size_t index = i + offset*num_anchors;
-    (*out_anchors)[index][0] = x_ctr - 0.5*(ws[i] - 1);
-    (*out_anchors)[index][1] = y_ctr - 0.5*(hs[i] - 1);
-    (*out_anchors)[index][2] = x_ctr + 0.5*(ws[i] - 1);
-    (*out_anchors)[index][3] = y_ctr + 0.5*(hs[i] - 1);
-  }
+inline void _mk_anchor(float w,
+                       float h,
+                       float x_ctr,
+                       float y_ctr,
+                       Tensor<cpu, 1> *out_anchors) {
+  (*out_anchors)[0] = x_ctr - 0.5*(w - 1);
+  (*out_anchors)[1] = y_ctr - 0.5*(h - 1);
+  (*out_anchors)[2] = x_ctr + 0.5*(w - 1);
+  (*out_anchors)[3] = y_ctr + 0.5*(h - 1);
 }
 
+inline void _transform(float scale,
+                      float ratio,
+                      const Tensor<cpu, 1>& base_anchor,
+                      Tensor<cpu, 1> *out_anchor) {
+  float w = base_anchor[2] - base_anchor[1] + 1;
+  float h = base_anchor[3] - base_anchor[1] + 1;
+  float x_ctr = base_anchor[0] + 0.5 * (w-1);
+  float y_ctr = base_anchor[1] + 0.5 * (h-1);
+  float size = w * h;
+  float size_ratios = size/ratio;
+  float new_w = std::round(std::sqrt(size_ratios))*scale;
+  float new_h = std::round(new_w * ratio);
 
-std::map<std::string, float> _find_whctrs(const mshadow::Tensor<cpu, 1>&
-                                          anchor) {
-  std::map<std::string, float> whctrs;
-  whctrs["w"] = anchor[2] - anchor[0] + 1;
-  whctrs["h"] = anchor[3] - anchor[1] + 1;
-  whctrs["x_ctr"]  = anchor[0] + 0.5 * (whctrs["w"] -1);
-  whctrs["y_ctr"] = anchor[1] + 0.5 * (whctrs["h"] - 1);
-  return whctrs;
+  _mk_anchor(new_w, new_h, x_ctr,
+             y_ctr, out_anchor);
 }
 
-inline void _scale_enum(const mshadow::Tensor<cpu, 2>& ratio_anchors,
-                const mshadow::Tensor<cpu, 1>& scales,
-                mshadow::Tensor<cpu, 2> *scales_tempspace,
-                mshadow::Tensor<cpu, 2> *out_anchors) {
-  std::map<std::string, float> whctrs;
-  mshadow::Tensor<cpu, 1> hs = (*scales_tempspace)[0];
-  mshadow::Tensor<cpu, 1> ws = (*scales_tempspace)[1];
-
-  for (size_t i = 0; i < ratio_anchors.size(0) ; i++) {
-    whctrs = _find_whctrs(ratio_anchors[i]);
-    ws = whctrs["w"] * scales;
-    hs = whctrs["h"] * scales;
-
-    size_t offset = i;
-    _mk_anchors(ws, hs, whctrs["x_ctr"], whctrs["y_ctr"], offset, out_anchors);
+// out_anchors must have shape (n,4), where n is ratios.size() * scales.size()
+inline void  generate_anchors(const Tensor<cpu, 1>& base_anchor,
+                              const std::vector<float>& ratios,
+                              const std::vector<float>& scales,
+                              Tensor<cpu, 2>* out_anchors) {
+  size_t i = 0;
+  for (auto const& ratio : ratios) {
+    for (auto const& scale : scales) {
+      Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
+      _transform(scale, ratio, base_anchor, &out_anchor);
+      i++;
+    }
   }
-}
-
-
-inline void _ratio_enum(const mshadow::Tensor<cpu, 1>& base_anchor,
-                const mshadow::Tensor<cpu, 1>& ratios,
-                mshadow::Tensor<cpu, 2> *ratios_tempspace,
-                mshadow::Tensor<cpu, 2> *out_ratio_anchors ) {
-  std::map<std::string, float> whctrs = _find_whctrs(base_anchor);
-  float size = whctrs["w"] * whctrs["h"];
-  mshadow::Tensor<cpu, 1> size_ratios = (*ratios_tempspace)[0];
-  mshadow::Tensor<cpu, 1> ws = (*ratios_tempspace)[1];
-  mshadow::Tensor<cpu, 1> hs = (*ratios_tempspace)[2];
-
-  size_ratios = size/ratios;
-  for (size_t i = 0; i < ratios.size(0); i++) {
-    ws[i] = std::round(std::sqrt(size_ratios[i]));
-    hs[i] = std::round(ws[i] * ratios[i]);
-  }
-  size_t offset = 0;
-  _mk_anchors(ws, hs, whctrs["x_ctr"], whctrs["y_ctr"], offset,
-              out_ratio_anchors);
-}
-
-inline void  generate_anchors(int base_size, const <cpu, 1>& ratios,
-                       const mshadow::Tensor<cpu, 1>& scales,
-                       mshadow::TensorContainer<cpu, 2>* out_anchors) {
-  // Construct base anchor
-  float base_anchor_data[] = {0, 0, base_size - 1, base_size -1};
-  mshadow::TensorContainer<cpu, 1> base_anchor(Shape1(4));
-  for (size_t i = 0; i < base_anchor.size(0); i++) {
-    base_anchor[i] = base_anchor_data[i];
-  }
-
-  // enumerate aspect ratios
-  mshadow::TensorContainer<cpu, 2> ratio_anchors(Shape2(ratios.size(0), 4));
-  mshadow::TensorContainer<cpu, 2> ratios_tempspace(Shape2(3, ratios.size(0)));
-  _ratio_enum(base_anchor, ratios, &ratios_tempspace, &ratio_anchors);
-
-  // enumerate scales per aspect ratio
-  mshadow::TensorContainer<cpu, 2> scales_tempspace(Shape2(2, scales.size(0)));
-  (*out_anchors).Resize(Shape2(scales.size(0) * ratios.size(0), 4));
-  _scale_enum(ratio_anchors, scales, &scales_tempspace, out_anchors);
 }
 
 }  // namespace utils
