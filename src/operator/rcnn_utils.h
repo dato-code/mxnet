@@ -210,9 +210,9 @@ inline void _Transform(float scale,
   float x_ctr = base_anchor[0] + 0.5 * (w-1);
   float y_ctr = base_anchor[1] + 0.5 * (h-1);
   float size = w * h;
-  float size_ratios = std::floor(size/ratio);
+  float size_ratios = size/ratio;
   float new_w = std::round(std::sqrt(size_ratios)) * scale;
-  float new_h = std::round(new_w/scale * ratio) * scale;
+  float new_h = std::round(new_w * ratio);
 
   _MakeAnchor(new_w, new_h, x_ctr,
              y_ctr, out_anchor);
@@ -234,104 +234,6 @@ inline void  GenerateAnchors(const Tensor<cpu, 1>& base_anchor,
     }
   }
 }
-
-}  // namespace utils
-}  // namespace op
-}  // namespace mxnet
-
-//============================
-// Bounding Box Transform Utils
-//============================
-namespace mxnet {
-namespace op {
-namespace utils {
-
-void bbox_transform(const Tensor<cpu, 2>& ex_rois,
-                    const Tensor<cpu, 2>& gt_rois,
-                    Tensor<cpu, 2> *out_targets) {
-  CHECK_EQ(ex_rois.size(1), 4);
-  CHECK_EQ(gt_rois.size(1), 4);
-  CHECK_EQ(out_targets->size(1), 4);
-  CHECK_EQ(ex_rois.size(0), gt_rois.size(0));
-  CHECK_EQ(gt_rois.size(0), out_targets->size(0));
-
-  size_t num_rois = ex_rois.size(0);
-
-  for (size_t i=0; i < num_rois; ++i) {
-    float ex_width = ex_rois[i][2] - ex_rois[i][0] + 1.0;
-    float ex_height = ex_rois[i][3] - ex_rois[i][1] + 1.0;
-    float ex_ctr_x = ex_rois[i][0] + 0.5 * ex_width;
-    float ex_ctr_y = ex_rois[i][1] + 0.5 * ex_height;
-
-    float gt_width = gt_rois[i][2] - gt_rois[i][0] + 1.0;
-    float gt_height = gt_rois[i][3] - gt_rois[i][1] + 1.0;
-    float gt_ctr_x = gt_rois[i][0] + 0.5 * gt_width;
-    float gt_ctr_y = gt_rois[i][1] + 0.5 * gt_height;
-
-    float target_dx = (gt_ctr_x - ex_ctr_x) / ex_width;
-    float target_dy = (gt_ctr_y - ex_ctr_y)/ ex_height;
-    float target_dw = log(gt_width) - log(ex_width);
-    float target_dh = log(gt_height) - log(ex_height);
-
-    (*out_targets)[i][0] = target_dx;
-    (*out_targets)[i][1] = target_dy;
-    (*out_targets)[i][2] = target_dw;
-    (*out_targets)[i][3] = target_dh;
-  }
-}
-
-void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
-                        const Tensor<cpu, 2>& deltas,
-                        Tensor<cpu, 2> *out_pred_boxes) {
-  CHECK_EQ(boxes.size(1), 4);
-  CHECK_EQ(deltas.size(1), 4);
-  CHECK_EQ(out_pred_boxes->size(1), 4);
-  CHECK_EQ(boxes.size(0), deltas.size(0));
-  CHECK_EQ(deltas.size(0), out_pred_boxes->size(1));
-
-  size_t num_boxes = boxes.size(0);
-
-  for (size_t i=0; i < num_boxes; ++i) {
-    float width = boxes[i][2] - boxes[i][0] + 1.0;
-    float height = boxes[i][3] - boxes[i][1] + 1.0;
-    float ctr_x = boxes[i][0] + 0.5 * width;
-    float ctr_y = boxes[i][1] + 0.5 * height;
-
-    float dx = deltas[i][0];
-    float dy = deltas[i][1];
-    float dw = deltas[i][2];
-    float dh = deltas[i][3];
-
-    float pred_ctr_x = dx * width + ctr_x;
-    float pred_ctr_y = dx * height + ctr_y;
-    float pred_w = exp(dw) * width;
-    float pred_h = exp(dh) * height;
-
-    (*out_pred_boxes)[i][0] = pred_ctr_x - 0.5 * pred_w;
-    (*out_pred_boxes)[i][1] = pred_ctr_y - 0.5 * pred_h;
-    (*out_pred_boxes)[i][2] = pred_ctr_x + 0.5 * pred_w;
-    (*out_pred_boxes)[i][3] = pred_ctr_y + 0.5 * pred_h;
-  }
-}
-
-void clip_boxes(const Shape<2>& im_shape, Tensor<cpu, 2> *in_out_boxes) {
-  CHECK_EQ(in_out_boxes->size(1), 4);
-
-  size_t num_boxes = out_boxes->size(0);
-
-  for (size_t i=0; i < num_boxes; ++i) {
-    (*in_out_boxes)[i][0] = std::max(std::min((*in_out_boxes)[i][0],
-          static_cast<float> (im_shape[1] - 1)), static_cast<float>(0));
-    (*in_out_boxes)[i][1] = std::max(std::min((*in_out_boxes)[i][1],
-          static_cast<float> (im_shape[0] - 1)), static_cast<float>(0));
-    (*in_out_boxes)[i][2] = std::max(std::min((*in_out_boxes)[i][2],
-          static_cast <float>(im_shape[1] - 1)), static_cast<float>(0));
-    (*in_out_boxes)[i][3] = std::max(std::min((*in_out_boxes)[i][3],
-          static_cast <float>(im_shape[0] - 1)), static_cast<float>(0));
-  }
-}
-
-
 
 }  // namespace utils
 }  // namespace op
