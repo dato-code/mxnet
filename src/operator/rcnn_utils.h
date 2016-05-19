@@ -179,7 +179,63 @@ inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
 }
 
 
-}  // utils
+}  // namespace utils
+}  // namespace op
+}  // namespace mxnet
+
+//========================
+// Anchor Generation Utils
+//========================
+namespace mxnet {
+namespace op {
+namespace utils {
+
+inline void _MakeAnchor(float w,
+                       float h,
+                       float x_ctr,
+                       float y_ctr,
+                       Tensor<cpu, 1> *out_anchors) {
+  (*out_anchors)[0] = x_ctr - 0.5*(w - 1);
+  (*out_anchors)[1] = y_ctr - 0.5*(h - 1);
+  (*out_anchors)[2] = x_ctr + 0.5*(w - 1);
+  (*out_anchors)[3] = y_ctr + 0.5*(h - 1);
+}
+
+inline void _Transform(float scale,
+                       float ratio,
+                       const Tensor<cpu, 1>& base_anchor,
+                       Tensor<cpu, 1> *out_anchor) {
+  float w = base_anchor[2] - base_anchor[1] + 1;
+  float h = base_anchor[3] - base_anchor[1] + 1;
+  float x_ctr = base_anchor[0] + 0.5 * (w-1);
+  float y_ctr = base_anchor[1] + 0.5 * (h-1);
+  float size = w * h;
+  float size_ratios = size/ratio;
+  float new_w = std::round(std::sqrt(size_ratios)) * scale;
+  float new_h = std::round(new_w * ratio);
+
+  _MakeAnchor(new_w, new_h, x_ctr,
+             y_ctr, out_anchor);
+}
+
+// out_anchors must have shape (n,4), where n is ratios.size() * scales.size()
+inline void  GenerateAnchors(const Tensor<cpu, 1>& base_anchor,
+                              const std::vector<float>& ratios,
+                              const std::vector<float>& scales,
+                              Tensor<cpu, 2>* out_anchors) {
+  CHECK_EQ(out_anchors->size(0), ratios.size() * scales.size());
+  CHECK_EQ(out_anchors->size(1), 4);
+  size_t i = 0;
+  for (size_t j = 0; j < ratios.size(); ++j) {
+    for (size_t k = 0; k < scales.size(); ++k) {
+      Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
+      _Transform(scale, ratio, base_anchor, &out_anchor);
+      ++i;
+    }
+  }
+}
+
+}  // namespace utils
 }  // namespace op
 }  // namespace mxnet
 
