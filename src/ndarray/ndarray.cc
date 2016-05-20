@@ -736,6 +736,7 @@ void NDArray::SyncCopyFromSFrame(const graphlab::flexible_type *data, size_t siz
           }
         }
       }
+      delete[] buf;
     } else {
       size_t cnt = 0;
       const unsigned char* raw_data = img.get_image_data();
