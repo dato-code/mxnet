@@ -51,4 +51,6 @@ from . import module as mod
 from . import module
 from . import module as mod
 
+from . import pretrained_model
+
 __version__ = base.__version__
