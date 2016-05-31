@@ -120,6 +120,9 @@ struct ReverseArgsortCompl {
 
 inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
                                   const float thresh,
+                                  const float min_size,
+                                  const index_t pre_nms_top_n,
+                                  const index_t post_nms_top_n,
                                   mshadow::Tensor<cpu, 2> *tempspace,
                                   mshadow::Tensor<cpu, 1> *output,
                                   index_t *out_size) {
@@ -141,42 +144,55 @@ inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
     score[i] = dets[i][4];
     order[i] = i;
   }
+
   // argsort to get order
   ReverseArgsortCompl cmpl(score.dptr_);
   std::sort(order.dptr_, order.dptr_ + dets.size(0), cmpl);
 
   // calculate nms
   *out_size = 0;
-  for (index_t i = 0; i < dets.shape_[0]; ++i) {
-    i = static_cast<index_t>(order[i]);
-    if (surprised[i] > 0.0f) {
-      continue;
-    }
-    keep[(*out_size)++] = i;
+  index_t valid_size= 0;
+  for (index_t k = 0; k < dets.size(0) && valid_size < pre_nms_top_n && (*out_size) < post_nms_top_n; ++k) {
+    index_t i = static_cast<index_t>(order[k]);
     float ix1 = dets[i][0];
     float iy1 = dets[i][1];
     float ix2 = dets[i][2];
     float iy2 = dets[i][3];
     float iarea = area[i];
-    for (index_t j = i + 1; j <dets.shape_[0]; ++j) {
-      j = static_cast<index_t>(order[j]);
-      if (surprised[j] > 0.0f) {
+    float ih = ix2 - ix1 + 1;
+    float iw = iy2 - iy1 + 1;
+ 
+    if (ih < min_size || iw < min_size) {
+      valid_size++;
+      continue;
+    } 
+    
+    if (surprised[i] > 0.0f ) {
+      continue;
+    } 
+
+    keep[(*out_size)++] = i;
+    
+    for (index_t j = k + 1; j <dets.shape_[0]; ++j) {
+      index_t l = static_cast<index_t>(order[j]);
+      if (surprised[l] > 0.0f) {
         continue;
       }
-      float xx1 = std::max(ix1, dets[j][0]);
-      float yy1 = std::max(iy1, dets[j][1]);
-      float xx2 = std::min(ix2, dets[j][2]);
-      float yy2 = std::min(iy2, dets[j][3]);
+      float xx1 = std::max(ix1, dets[l][0]);
+      float yy1 = std::max(iy1, dets[l][1]);
+      float xx2 = std::min(ix2, dets[l][2]);
+      float yy2 = std::min(iy2, dets[l][3]);
       float w = std::max(0.0f, xx2 - xx1 + 1);
       float h = std::max(0.0f, yy2 - yy1 + 1);
       float inter = w * h;
-      float ovr = inter / (iarea + area[j] - inter);
-      if (ovr > thresh) {
-        surprised[j] = 1.0f;
+      float ovr = inter / (iarea + area[l] - inter);
+      if (ovr > thresh ) {
+        surprised[l] = 1.0f;
       }
     }
   }
 }
+
 
 
 }  // namespace utils
@@ -284,33 +300,36 @@ void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
                         const Tensor<cpu, 2>& deltas,
                         Tensor<cpu, 2> *out_pred_boxes) {
   CHECK_EQ(boxes.size(1), 4);
-  CHECK_EQ(deltas.size(1), 4);
   CHECK_EQ(out_pred_boxes->size(1), 4);
-  CHECK_EQ(boxes.size(0), deltas.size(0));
-  CHECK_EQ(deltas.size(0), out_pred_boxes->size(1));
+  size_t anchors = deltas.size(1)/4;
+  size_t heights = deltas.size(2);
+  size_t widths = deltas.size(3);
 
-  size_t num_boxes = boxes.size(0);
+  for (size_t a = 0; a < anchors; ++a) {
+    for (size_t h = 0; h < heights; ++h) {
+      for (size_t w = 0; w < widths; ++w) {
+        index_t index = h* (widths * anchors) + w * (anchors) + a;
+        float width = boxes[index][2] - boxes[index][0] + 1.0;
+        float height = boxes[index][3] - boxes[index][1] + 1.0;
+        float ctr_x = boxes[index][0] + 0.5 * width;
+        float ctr_y = boxes[index][1] + 0.5 * height;
 
-  for (size_t i=0; i < num_boxes; ++i) {
-    float width = boxes[i][2] - boxes[i][0] + 1.0;
-    float height = boxes[i][3] - boxes[i][1] + 1.0;
-    float ctr_x = boxes[i][0] + 0.5 * width;
-    float ctr_y = boxes[i][1] + 0.5 * height;
+        float dx = deltas[0][a*4 + 0][h][w];
+        float dy = deltas[0][a*4 + 1][h][w];
+        float dw = deltas[0][a*4 + 2][h][w];
+        float dh = deltas[0][a*4 + 3][h][w];
+      
+        float pred_ctr_x = dx * width + ctr_x;
+        float pred_ctr_y = dx * height + ctr_y;
+        float pred_w = exp(dw) * width;
+        float pred_h = exp(dh) * height;
 
-    float dx = deltas[i][0];
-    float dy = deltas[i][1];
-    float dw = deltas[i][2];
-    float dh = deltas[i][3];
-
-    float pred_ctr_x = dx * width + ctr_x;
-    float pred_ctr_y = dx * height + ctr_y;
-    float pred_w = exp(dw) * width;
-    float pred_h = exp(dh) * height;
-
-    (*out_pred_boxes)[i][0] = pred_ctr_x - 0.5 * pred_w;
-    (*out_pred_boxes)[i][1] = pred_ctr_y - 0.5 * pred_h;
-    (*out_pred_boxes)[i][2] = pred_ctr_x + 0.5 * pred_w;
-    (*out_pred_boxes)[i][3] = pred_ctr_y + 0.5 * pred_h;
+        (*out_pred_boxes)[index][0] = pred_ctr_x - 0.5 * pred_w;
+        (*out_pred_boxes)[index][1] = pred_ctr_y - 0.5 * pred_h;
+        (*out_pred_boxes)[index][2] = pred_ctr_x + 0.5 * pred_w;
+        (*out_pred_boxes)[index][3] = pred_ctr_y + 0.5 * pred_h;
+      }
+    }
   }
 }
 
