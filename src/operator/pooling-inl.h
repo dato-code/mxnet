@@ -154,7 +154,6 @@ class PoolingOp : public Operator {
                   param_.pad[1]));
     }
   }
-
  private:
   PoolingParam param_;
 };  // class PoolingOp

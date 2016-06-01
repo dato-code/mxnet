@@ -10,6 +10,8 @@
 #include <mshadow/tensor.h>
 #include <mshadow/extension.h>
 
+namespace mshadow {
+namespace expr {
 //=========================
 // BBox Overlap mshadow exp
 //=========================
@@ -152,7 +154,8 @@ inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
   // calculate nms
   *out_size = 0;
   index_t valid_size= 0;
-  for (index_t k = 0; k < dets.size(0) && valid_size < pre_nms_top_n && (*out_size) < post_nms_top_n; ++k) {
+  for (index_t k = 0; k < dets.size(0) && valid_size <
+       pre_nms_top_n && (*out_size) < post_nms_top_n; ++k) {
     index_t i = static_cast<index_t>(order[k]);
     float ix1 = dets[i][0];
     float iy1 = dets[i][1];
@@ -161,18 +164,16 @@ inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
     float iarea = area[i];
     float ih = ix2 - ix1 + 1;
     float iw = iy2 - iy1 + 1;
- 
+
     if (ih < min_size || iw < min_size) {
       valid_size++;
       continue;
-    } 
-    
+    }
     if (surprised[i] > 0.0f ) {
       continue;
-    } 
+    }
 
     keep[(*out_size)++] = i;
-    
     for (index_t j = k + 1; j <dets.shape_[0]; ++j) {
       index_t l = static_cast<index_t>(order[j]);
       if (surprised[l] > 0.0f) {
@@ -207,10 +208,10 @@ namespace op {
 namespace utils {
 
 inline void _MakeAnchor(float w,
-                       float h,
-                       float x_ctr,
-                       float y_ctr,
-                       Tensor<cpu, 1> *out_anchors) {
+                        float h,
+                        float x_ctr,
+                        float y_ctr,
+                        mshadow::Tensor<cpu, 1> *out_anchors) {
   (*out_anchors)[0] = x_ctr - 0.5*(w - 1);
   (*out_anchors)[1] = y_ctr - 0.5*(h - 1);
   (*out_anchors)[2] = x_ctr + 0.5*(w - 1);
@@ -219,8 +220,8 @@ inline void _MakeAnchor(float w,
 
 inline void _Transform(float scale,
                        float ratio,
-                       const Tensor<cpu, 1>& base_anchor,
-                       Tensor<cpu, 1> *out_anchor) {
+                       const std::vector<float>& base_anchor,
+                       mshadow::Tensor<cpu, 1> *out_anchor) {
   float w = base_anchor[2] - base_anchor[1] + 1;
   float h = base_anchor[3] - base_anchor[1] + 1;
   float x_ctr = base_anchor[0] + 0.5 * (w-1);
@@ -235,17 +236,17 @@ inline void _Transform(float scale,
 }
 
 // out_anchors must have shape (n,4), where n is ratios.size() * scales.size()
-inline void  GenerateAnchors(const Tensor<cpu, 1>& base_anchor,
-                              const std::vector<float>& ratios,
-                              const std::vector<float>& scales,
-                              Tensor<cpu, 2>* out_anchors) {
+inline void GenerateAnchors(const std::vector<float>& base_anchor,
+                            const std::vector<float>& ratios,
+                            const std::vector<float>& scales,
+                            mshadow::Tensor<cpu, 2>* out_anchors) {
   CHECK_EQ(out_anchors->size(0), ratios.size() * scales.size());
   CHECK_EQ(out_anchors->size(1), 4);
   size_t i = 0;
   for (size_t j = 0; j < ratios.size(); ++j) {
     for (size_t k = 0; k < scales.size(); ++k) {
-      Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
-      _Transform(scale, ratio, base_anchor, &out_anchor);
+      mshadow::Tensor<cpu, 1> out_anchor = (*out_anchors)[i];
+      _Transform(scales[k], ratios[j], base_anchor, &out_anchor);
       ++i;
     }
   }
@@ -262,9 +263,9 @@ namespace mxnet {
 namespace op {
 namespace utils {
 
-void bbox_transform(const Tensor<cpu, 2>& ex_rois,
-                    const Tensor<cpu, 2>& gt_rois,
-                    Tensor<cpu, 2> *out_targets) {
+void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
+                   const mshadow::Tensor<cpu, 2>& gt_rois,
+                   mshadow::Tensor<cpu, 2> *out_targets) {
   CHECK_EQ(ex_rois.size(1), 4);
   CHECK_EQ(gt_rois.size(1), 4);
   CHECK_EQ(out_targets->size(1), 4);
@@ -296,9 +297,9 @@ void bbox_transform(const Tensor<cpu, 2>& ex_rois,
   }
 }
 
-void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
-                        const Tensor<cpu, 2>& deltas,
-                        Tensor<cpu, 2> *out_pred_boxes) {
+void BBoxTransfromInv(const mshadow::Tensor<cpu, 2>& boxes,
+                      const mshadow::Tensor<cpu, 2>& deltas,
+                      mshadow::Tensor<cpu, 2> *out_pred_boxes) {
   CHECK_EQ(boxes.size(1), 4);
   CHECK_EQ(out_pred_boxes->size(1), 4);
   size_t anchors = deltas.size(1)/4;
@@ -308,7 +309,7 @@ void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
   for (size_t a = 0; a < anchors; ++a) {
     for (size_t h = 0; h < heights; ++h) {
       for (size_t w = 0; w < widths; ++w) {
-        index_t index = h* (widths * anchors) + w * (anchors) + a;
+        index_t index = h * (widths * anchors) + w * (anchors) + a;
         float width = boxes[index][2] - boxes[index][0] + 1.0;
         float height = boxes[index][3] - boxes[index][1] + 1.0;
         float ctr_x = boxes[index][0] + 0.5 * width;
@@ -318,7 +319,7 @@ void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
         float dy = deltas[0][a*4 + 1][h][w];
         float dw = deltas[0][a*4 + 2][h][w];
         float dh = deltas[0][a*4 + 3][h][w];
-      
+
         float pred_ctr_x = dx * width + ctr_x;
         float pred_ctr_y = dx * height + ctr_y;
         float pred_w = exp(dw) * width;
@@ -333,9 +334,8 @@ void bbox_transform_inv(const Tensor<cpu, 2>& boxes,
   }
 }
 
-void clip_boxes(const Shape<2>& im_shape, Tensor<cpu, 2> *in_out_boxes) {
+void ClipBoxes(const Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
   CHECK_EQ(in_out_boxes->size(1), 4);
-
   size_t num_boxes = out_boxes->size(0);
 
   for (size_t i=0; i < num_boxes; ++i) {
