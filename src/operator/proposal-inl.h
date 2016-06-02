@@ -172,17 +172,17 @@ class ProposalOp : public NativeOpBase<xpu> {
     real_t* foreground_score_pointer =
       Parent::in_data_ptr_[proposal::kClsProb] + scores_shape.Size();
 
-    Tensor<xpu, 4> scores =  Tensor<xpu, 4>(foreground_score_pointer, scores_shape);
-    Tensor<xpu, 4> bbox_deltas = Tensor<xpu, 4>(Parent::in_data_ptr_[proposal::kBBoxPred],
+    Tensor<cpu, 4> scores =  Tensor<cpu, 4>(foreground_score_pointer, scores_shape);
+    Tensor<cpu, 4> bbox_deltas = Tensor<cpu, 4>(Parent::in_data_ptr_[proposal::kBBoxPred],
                                                 bbox_deltas_shape);
-    Tensor<xpu, 2> im_info = Tensor<xpu, 2>(Parent::in_data_ptr_[proposal::kImInfo],
+    Tensor<cpu, 2> im_info = Tensor<cpu, 2>(Parent::in_data_ptr_[proposal::kImInfo],
                                             im_info_shape);
 
-    Tensor<xpu, 3> out = Tensor<xpu, 3>(Parent::out_data_ptr_[proposal::kOut],
+    Tensor<cpu, 3> out = Tensor<cpu, 3>(Parent::out_data_ptr_[proposal::kOut],
                                         out_shape);
-    Tensor<xpu, 2> workspace_proposals = Tensor<xpu, 2>(Parent::out_data_ptr_[1],
+    Tensor<cpu, 2> workspace_proposals = Tensor<cpu, 2>(Parent::out_data_ptr_[1],
                                                         workspace_proposals_shape);
-    Tensor<xpu, 2> workspace_nms = Tensor<xpu, 2>(Parent::out_data_ptr_[2],
+    Tensor<cpu, 2> workspace_nms = Tensor<cpu, 2>(Parent::out_data_ptr_[2],
                                                   workspace_nms_shape);
 
     index_t height = scores.size(2);
@@ -222,7 +222,7 @@ class ProposalOp : public NativeOpBase<xpu> {
 
     float scale = im_info[0][2];
     index_t out_size;
-    Tensor<xpu, 1> output = workspace_nms[4];
+    Tensor<cpu, 1> output = workspace_nms[4];
 
     utils::NonMaximumSuppression(workspace_proposals,
                           param_.threshold,

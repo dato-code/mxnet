@@ -228,8 +228,8 @@ inline void _Transform(float scale,
   float y_ctr = base_anchor[1] + 0.5 * (h-1);
   float size = w * h;
   float size_ratios = std::floor(size / ratio);
-  float new_w = std::round(std::sqrt(size_ratios)) * scale;
-  float new_h = std::round(new_w / scale * ratio) * scale;
+  float new_w = int(std::sqrt(size_ratios) + 0.5) * scale;
+  float new_h = int(new_w / scale * ratio + 0.5) * scale;
 
   _MakeAnchor(new_w, new_h, x_ctr,
              y_ctr, out_anchor);
@@ -263,7 +263,7 @@ namespace mxnet {
 namespace op {
 namespace utils {
 
-void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
+inline void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
                    const mshadow::Tensor<cpu, 2>& gt_rois,
                    mshadow::Tensor<cpu, 2> *out_targets) {
   CHECK_EQ(ex_rois.size(1), 4);
@@ -297,7 +297,7 @@ void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
   }
 }
 
-void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
+inline void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
                       const mshadow::Tensor<cpu, 4>& deltas,
                       mshadow::Tensor<cpu, 2> *out_pred_boxes) {
   CHECK_EQ(boxes.size(1), 4);
@@ -334,7 +334,7 @@ void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
   }
 }
 
-void ClipBoxes(const mshadow::Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
+inline void ClipBoxes(const mshadow::Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
   CHECK_EQ(in_out_boxes->size(1), 4);
   size_t num_boxes = in_out_boxes->size(0);
 
