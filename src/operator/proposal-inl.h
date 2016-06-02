@@ -292,6 +292,13 @@ class ProposalProp : public OperatorProperty {
     return "Proposal";
   }
 
+  std::vector<int> DeclareBackwardDependency(
+    const std::vector<int> &out_grad,
+    const std::vector<int> &in_data,
+    const std::vector<int> &out_data) const override {
+    return {};
+  }
+
   int NumVisibleOutputs() const override {
     return 1;
   }
