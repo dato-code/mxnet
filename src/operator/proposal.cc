@@ -14,7 +14,10 @@ Operator *CreateOp<cpu>(ProposalParam param) {
   return new ProposalOp<cpu>(param);
 }
 
-Operator *ProposalProp::CreateOperator(Context ctx, std::vector<TShape> *in_shape) const {
+Operator *ProposalProp::CreateOperatorEx(Context ctx, std::vector<TShape> *in_shape,
+                                        std::vector<int> * in_type) const {
+  std::vector<TShape> out_shape, aux_shape;
+  CHECK(InferShape(in_shape, &out_shape, &aux_shape));
   DO_BIND_DISPATCH(CreateOp, param_);
 }
 

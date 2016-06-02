@@ -104,14 +104,14 @@ struct ProposalParam : public dmlc::Parameter<ProposalParam> {
     .describe("NMS value, below which to suppress.");
     DMLC_DECLARE_FIELD(rpn_min_size).set_default(16)
     .describe("Minimum height or width in proposal");
-    DMLC_DECLARE_FIELD(scales).set_default(AnchorInfo)
+    DMLC_DECLARE_FIELD(scales).set_default(AnchorInfo())
     .describe("Used to generate anchor windows by enumerating scales");
-    DMLC_DECLARE_FIELD(ratios).set_default(AnchorInfo)
+    DMLC_DECLARE_FIELD(ratios).set_default(AnchorInfo())
     .describe("Used to generate anchor windows by enumerating ratios");
-    DMLC_DECLARE_FIELD(base_size).set_default(AnchorInfo)
+    DMLC_DECLARE_FIELD(base_anchor).set_default(AnchorInfo())
     .describe("The base anchor that is used as reference anchor for generating anchors.");
     DMLC_DECLARE_FIELD(feature_stride).set_default(1)
-    .desctibe("The size of the receptive field each unit in the convolution layer of the rpn,"
+    .describe("The size of the receptive field each unit in the convolution layer of the rpn,"
               "for example the product of all stride's prior to this layer.");
   }
 };
@@ -136,46 +136,69 @@ class ProposalOp : public NativeOpBase<xpu> {
     CHECK_EQ(req[proposal::kOut], kWriteTo);
 
     Stream<xpu> *s = ctx.get_stream<xpu>();
-    Parent::_InitForward(ctx, in_data, out_data, aux_args);
-    Parent::_SyncData(in_data, Parent::in_data_prt_, s, nativeop::kTensorToData);
+    Parent::_InitForward(ctx, in_data, out_data, aux_states);
+    Parent::_SyncData(in_data, Parent::in_data_ptr_, s, nativeop::kTensorToData);
 
-    size_t num_amchors = in_data[0].shape_[1] / 2;
-    Shape<4> scores_shape = in_data[0].shape_;
-    scores_shape = Shape4(scores_shape[0],
-                          scores_shape[1] / 2,
-                          scores_shape[2],
-                          scores_shape[3]);
+    size_t num_anchors = in_data[0].shape_[1] / 2;
+    Shape<4> scores_shape = Shape4(in_data[0].shape_[0],
+                            in_data[0].shape_[1] / 2,
+                            in_data[0].shape_[2],
+                            in_data[0].shape_[3]);
+
+    Shape<4> bbox_deltas_shape = Shape4(in_data[1].shape_[0],
+                            in_data[1].shape_[1],
+                            in_data[1].shape_[2],
+                            in_data[1].shape_[3]);
+
+    Shape<2> im_info_shape = Shape2(in_data[2].shape_[0],
+                            in_data[2].shape_[1]);
+
+    Shape<3> out_shape = Shape3(out_data[0].shape_[0],
+                            out_data[0].shape_[1],
+                            out_data[0].shape_[2]);
+
+    Shape<2> workspace_proposals_shape = Shape2(in_data[1].shape_[0],
+                                                in_data[1].shape_[1]);
+
+    Shape<2> workspace_nms_shape = Shape2(in_data[2].shape_[0],
+                                          in_data[2].shape_[1]);
+
+
+
+
+
+    
 
     real_t* foreground_score_pointer =
-      Parent::in_data_ptr_[proposal::kClsPred] + score_shape.Size();
+      Parent::in_data_ptr_[proposal::kClsProb] + scores_shape.Size();
 
     Tensor<xpu, 4> scores =  Tensor<xpu, 4>(foreground_score_pointer, scores_shape);
     Tensor<xpu, 4> bbox_deltas = Tensor<xpu, 4>(Parent::in_data_ptr_[proposal::kBBoxPred],
-                                                in_data[1].shape_);
+                                                bbox_deltas_shape);
     Tensor<xpu, 2> im_info = Tensor<xpu, 2>(Parent::in_data_ptr_[proposal::kImInfo],
-                                            in_data[proposal::kImInfo].shape_);
+                                            im_info_shape);
 
     Tensor<xpu, 3> out = Tensor<xpu, 3>(Parent::out_data_ptr_[proposal::kOut],
-                                        out_data[0].shape_);
+                                        out_shape);
     Tensor<xpu, 2> workspace_proposals = Tensor<xpu, 2>(Parent::out_data_ptr_[1],
-                                                        out_data[1].shape_);
+                                                        workspace_proposals_shape);
     Tensor<xpu, 2> workspace_nms = Tensor<xpu, 2>(Parent::out_data_ptr_[2],
-                                                  out_data[2].shape_ );
+                                                  workspace_nms_shape);
 
     index_t height = scores.size(2);
     index_t width = scores.size(3);
 
 
-    GenerateAnchors(param_.base_anchor,
-                    param_.ratios,
-                    param._scales,
+    utils::GenerateAnchors(param_.base_anchor.info,
+                    param_.ratios.info,
+                    param_.scales.info,
                     &workspace_proposals);
 
     //Enumerate all shifted anchors
     for (index_t i = 0; i < num_anchors; ++i){
-      for (index_t j = 0; j < heights; ++j){
-        for (index_t k = 0; k < widths; ++k){
-          index_t index = j * (widths * num_anchors) + k * (num_anchors) + i;
+      for (index_t j = 0; j < height; ++j){
+        for (index_t k = 0; k < width; ++k){
+          index_t index = j * (width * num_anchors) + k * (num_anchors) + i;
           workspace_proposals[index][0] = workspace_proposals[i][0] + k * param_.feature_stride;
           workspace_proposals[index][1] = workspace_proposals[i][1] + j * param_.feature_stride;
           workspace_proposals[index][2] = workspace_proposals[i][2] + k * param_.feature_stride;
@@ -186,25 +209,25 @@ class ProposalOp : public NativeOpBase<xpu> {
 
     //Copy scores to workspace.
     for (index_t i = 0; i < num_anchors; i++) {
-      for (index_t h = 0; h < heights; h++) {
-        for (index_t w = 0; w < widths; w++) {
-          index_t index = h * (widths * num_anchors) + w * (num_anchors) + i;
+      for (index_t h = 0; h < height; h++) {
+        for (index_t w = 0; w < width; w++) {
+          index_t index = h * (width * num_anchors) + w * (num_anchors) + i;
           workspace_proposals[index][4] = scores[0][i][h][w];
         }
       }
     }
 
-    BBoxTransformInv(workspace_proposals, deltas, &(workspace_proposals));
-    ClipBoxes(Shape2(im_info[0][0],im_info[0][1]), &(workspace_proposals));
+    utils::BBoxTransformInv(workspace_proposals, bbox_deltas, &(workspace_proposals));
+    utils::ClipBoxes(Shape2(im_info[0][0],im_info[0][1]), &(workspace_proposals));
 
     float scale = im_info[0][2];
-    float out_size;
+    index_t out_size;
     Tensor<xpu, 1> output = workspace_nms[4];
 
-    NonMaximumSuppression(workspace_proposals,
-                          param._threshold,
-                          param_.nms_min_size * scale, param_.pre_nms_top_n,
-                          param_.post_nms_top_n,
+    utils::NonMaximumSuppression(workspace_proposals,
+                          param_.threshold,
+                          param_.rpn_min_size * scale, param_.rpn_pre_nms_top_n,
+                          param_.rpn_post_nms_top_n,
                           &workspace_nms,
                           &output,
                           &out_size);
@@ -215,7 +238,7 @@ class ProposalOp : public NativeOpBase<xpu> {
         out[i][j] = workspace_proposals[index][j];
       }
     }
-    Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDatatoTensor);
+    Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
   }
 
  private:
@@ -245,9 +268,13 @@ class ProposalProp : public OperatorProperty {
     CHECK_EQ(in_shape->size(), 3) << "Input:[cls_prob, bbox_pred, im_info]";
     const TShape &dshape = in_shape->at(proposal::kClsProb);
     if (dshape.ndim() == 0) return false;
-    SHAPE_ASSIGN_CHECK(in_shape, proposal::kBBoxPred,
-                       Shape4(dshape[0], dshape[1] * 2, dshape[2], dshape[3]));
-    SHAPE_ASSIGN_CHECK(in_shape, proposal::kImInfo, Shape2(1, 3));
+    Shape<4> bbox_pred_shape;
+    bbox_pred_shape = Shape4(dshape[0], dshape[1] * 2, dshape[2], dshape[3]);
+    SHAPE_ASSIGN_CHECK(*in_shape, proposal::kBBoxPred,
+                       bbox_pred_shape);
+    Shape<2> im_info_shape;
+    im_info_shape = Shape2(1,3);
+    SHAPE_ASSIGN_CHECK(*in_shape, proposal::kImInfo, im_info_shape);
     out_shape->clear();
     out_shape->push_back(Shape2(param_.rpn_post_nms_top_n, 5));
     out_shape->push_back(Shape2(dshape[1] / 2 * dshape[2] * dshape[3], 5));
@@ -282,7 +309,14 @@ class ProposalProp : public OperatorProperty {
     return {"proposals", "temp_proposal", "temp_nms" };
   }
 
-  Operator* CreateOperator(Context ctx) const override;
+  Operator* CreateOperator(Context ctx) const override {
+    LOG(FATAL) << "Not Implemented.";
+    return NULL;
+  }
+
+  Operator* CreateOperatorEx(Context ctx, std::vector<TShape> *in_shape, 
+                             std::vector<int>* in_type) const override;
+
 
  private:
   ProposalParam param_;

@@ -297,8 +297,8 @@ void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
   }
 }
 
-void BBoxTransfromInv(const mshadow::Tensor<cpu, 2>& boxes,
-                      const mshadow::Tensor<cpu, 2>& deltas,
+void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
+                      const mshadow::Tensor<cpu, 4>& deltas,
                       mshadow::Tensor<cpu, 2> *out_pred_boxes) {
   CHECK_EQ(boxes.size(1), 4);
   CHECK_EQ(out_pred_boxes->size(1), 4);
@@ -321,7 +321,7 @@ void BBoxTransfromInv(const mshadow::Tensor<cpu, 2>& boxes,
         float dh = deltas[0][a*4 + 3][h][w];
 
         float pred_ctr_x = dx * width + ctr_x;
-        float pred_ctr_y = dx * height + ctr_y;
+        float pred_ctr_y = dy * height + ctr_y;
         float pred_w = exp(dw) * width;
         float pred_h = exp(dh) * height;
 
@@ -334,9 +334,9 @@ void BBoxTransfromInv(const mshadow::Tensor<cpu, 2>& boxes,
   }
 }
 
-void ClipBoxes(const Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
+void ClipBoxes(const mshadow::Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
   CHECK_EQ(in_out_boxes->size(1), 4);
-  size_t num_boxes = out_boxes->size(0);
+  size_t num_boxes = in_out_boxes->size(0);
 
   for (size_t i=0; i < num_boxes; ++i) {
     (*in_out_boxes)[i][0] = std::max(std::min((*in_out_boxes)[i][0],
