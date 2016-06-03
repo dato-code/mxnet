@@ -156,9 +156,8 @@ class ProposalOp : public NativeOpBase<xpu> {
     Shape<2> im_info_shape = Shape2(in_data[proposal::kImInfo].shape_[0],
                             in_data[proposal::kImInfo].shape_[1]);
 
-    Shape<3> out_shape = Shape3(out_data[proposal::kOut].shape_[0],
-                            out_data[proposal::kOut].shape_[1],
-                            out_data[proposal::kOut].shape_[2]);
+    Shape<2> out_shape = Shape2(out_data[proposal::kOut].shape_[0],
+                            out_data[proposal::kOut].shape_[1]);
 
     Shape<2> workspace_proposals_shape = Shape2(out_data[proposal::kTempProposal].shape_[0],
                                                 out_data[proposal::kTempProposal].shape_[1]);
@@ -175,7 +174,7 @@ class ProposalOp : public NativeOpBase<xpu> {
     Tensor<cpu, 2> im_info = Tensor<cpu, 2>(Parent::in_data_ptr_[proposal::kImInfo],
                                             im_info_shape);
 
-    Tensor<cpu, 3> out = Tensor<cpu, 3>(Parent::out_data_ptr_[proposal::kOut],
+    Tensor<cpu, 2> out = Tensor<cpu, 2>(Parent::out_data_ptr_[proposal::kOut],
                                         out_shape);
 
     Tensor<cpu, 2> workspace_proposals = Tensor<cpu, 2>(Parent::out_data_ptr_[proposal::kTempProposal],
@@ -241,7 +240,6 @@ class ProposalOp : public NativeOpBase<xpu> {
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
     if (s != NULL) s->Wait();
-    ctx.async_on_complete();
   }
 
  private:
