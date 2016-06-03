@@ -235,7 +235,11 @@ class ProposalOp : public NativeOpBase<xpu> {
       //batch index 0
       out[i][0] = 0; 
       for (index_t j = 0; j < 4; ++j) {
-        out[i][j + 1] =  workspace_proposals[index][j];
+        if (i < out_size) {
+          out[i][j + 1] =  workspace_proposals[index][j];
+        } else {
+          out[i][j+1] = 0;
+        }
       }
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
