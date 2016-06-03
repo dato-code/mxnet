@@ -139,7 +139,8 @@ class ProposalOp : public NativeOpBase<xpu> {
     Stream<xpu> *s = ctx.get_stream<xpu>();
     Parent::_InitForward(ctx, in_data, out_data, aux_states);
     Parent::_SyncData(in_data, Parent::in_data_ptr_, s, nativeop::kTensorToData);
-
+    this->_InitProposalForward(in_data, out_data, aux_states);
+ 
     size_t num_anchors = in_data[0].shape_[1] / 2;
     Shape<4> scores_shape = Shape4(in_data[0].shape_[0],
                             in_data[0].shape_[1] / 2,
@@ -241,10 +242,42 @@ class ProposalOp : public NativeOpBase<xpu> {
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
   }
+  
+  private:
+  typedef NativeOpBase<xpu> Parent;
+  inline void _InitProposalEntry(const std::vector<TBlob> &tblob_vec,
+                               const std::vector<real_t*> &vec,
+                               int tag,
+                               uint64_t *idx) {
+    for (size_t i = 0; i < vec.size(); ++i) {
+      ptrs_[*idx] = vec[i];
+      ndims_[*idx] = tblob_vec[i].ndim();
+      shapes_[*idx] = const_cast<index_t*>(tblob_vec[i].shape_.data());
+      tags_[*idx] = tag;
+      ++(*idx);
+    }
+  }
+  inline void _InitProposalForward(const std::vector<TBlob> &in_data,
+                                 const std::vector<TBlob> &out_data,
+                                 const std::vector<TBlob> &aux_args) {
+    uint64_t size = in_data.size() + out_data.size();
+    ptrs_.resize(size);
+    ndims_.resize(size);
+    shapes_.resize(size);
+    tags_.resize(size);
+    uint64_t idx = 0;
+    _InitProposalEntry(in_data, Parent::in_data_ptr_, 0, &idx);
+    _InitProposalEntry(out_data, Parent::out_data_ptr_, 1, &idx);
+    // _InitNativeEntry(aux_args, aux_args_ptr_, 4, &idx);
+  }
+
 
  private:
-  typedef NativeOpBase<xpu> Parent;
   ProposalParam param_;
+  std::vector<real_t*> ptrs_;
+  std::vector<int> ndims_;
+  std::vector<unsigned*> shapes_;
+  std::vector<int> tags_;
 };  // class ProposalOp
 
 template<typename xpu>
