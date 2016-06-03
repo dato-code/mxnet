@@ -140,37 +140,31 @@ class ProposalOp : public NativeOpBase<xpu> {
     Parent::_InitForward(ctx, in_data, out_data, aux_states);
     Parent::_SyncData(in_data, Parent::in_data_ptr_, s, nativeop::kTensorToData);
     if (s != NULL) s->Wait();
-    this->_InitProposalForward(in_data, out_data, aux_states);
  
-    size_t num_anchors = in_data[0].shape_[1] / 2;
-    Shape<4> scores_shape = Shape4(in_data[0].shape_[0],
-                            in_data[0].shape_[1] / 2,
-                            in_data[0].shape_[2],
-                            in_data[0].shape_[3]);
+    size_t num_anchors = in_data[proposal::kClsProb].shape_[1] / 2;
+    Shape<4> scores_shape = Shape4(in_data[proposal::kClsProb].shape_[0],
+                            in_data[proposal::kClsProb].shape_[1] / 2,
+                            in_data[proposal::kClsProb].shape_[2],
+                            in_data[proposal::kClsProb].shape_[3]);
+  
 
-    Shape<4> bbox_deltas_shape = Shape4(in_data[1].shape_[0],
-                            in_data[1].shape_[1],
-                            in_data[1].shape_[2],
-                            in_data[1].shape_[3]);
+    Shape<4> bbox_deltas_shape = Shape4(in_data[proposal::kBBoxPred].shape_[0],
+                            in_data[proposal::kBBoxPred].shape_[1],
+                            in_data[proposal::kBBoxPred].shape_[2],
+                            in_data[proposal::kBBoxPred].shape_[3]);
 
-    Shape<2> im_info_shape = Shape2(in_data[2].shape_[0],
-                            in_data[2].shape_[1]);
+    Shape<2> im_info_shape = Shape2(in_data[proposal::kImInfo].shape_[0],
+                            in_data[proposal::kImInfo].shape_[1]);
 
-    Shape<3> out_shape = Shape3(out_data[0].shape_[0],
-                            out_data[0].shape_[1],
-                            out_data[0].shape_[2]);
+    Shape<3> out_shape = Shape3(out_data[proposal::kOut].shape_[0],
+                            out_data[proposal::kOut].shape_[1],
+                            out_data[proposal::kOut].shape_[2]);
 
-    Shape<2> workspace_proposals_shape = Shape2(out_data[1].shape_[0],
-                                                out_data[1].shape_[1]);
+    Shape<2> workspace_proposals_shape = Shape2(out_data[proposal::kTempProposal].shape_[0],
+                                                out_data[proposal::kTempProposal].shape_[1]);
 
-    Shape<2> workspace_nms_shape = Shape2(out_data[2].shape_[0],
-                                          out_data[2].shape_[1]);
-
-
-
-
-
-    
+    Shape<2> workspace_nms_shape = Shape2(out_data[proposal::kTempNMS].shape_[0],
+                                          out_data[proposal::kTempNMS].shape_[1]);
 
     real_t* foreground_score_pointer =
       Parent::in_data_ptr_[proposal::kClsProb] + scores_shape.Size();
@@ -183,9 +177,11 @@ class ProposalOp : public NativeOpBase<xpu> {
 
     Tensor<cpu, 3> out = Tensor<cpu, 3>(Parent::out_data_ptr_[proposal::kOut],
                                         out_shape);
-    Tensor<cpu, 2> workspace_proposals = Tensor<cpu, 2>(Parent::out_data_ptr_[1],
+
+    Tensor<cpu, 2> workspace_proposals = Tensor<cpu, 2>(Parent::out_data_ptr_[proposal::kTempProposal],
                                                         workspace_proposals_shape);
-    Tensor<cpu, 2> workspace_nms = Tensor<cpu, 2>(Parent::out_data_ptr_[2],
+
+    Tensor<cpu, 2> workspace_nms = Tensor<cpu, 2>(Parent::out_data_ptr_[proposal::kTempNMS],
                                                   workspace_nms_shape);
 
     index_t height = scores.size(2);
@@ -237,7 +233,9 @@ class ProposalOp : public NativeOpBase<xpu> {
 
     for (index_t i = 0; i < out_size; ++i) {
       index_t index = output[i];
-      for (index_t j = 0; j < 4; ++j) {
+      //batch index 0
+      out[i][0] = 0;
+      for (index_t j = 1; j < 5; ++j) {
         out[i][j] = workspace_proposals[index][j];
       }
     }
@@ -245,42 +243,10 @@ class ProposalOp : public NativeOpBase<xpu> {
     if (s != NULL) s->Wait();
     ctx.async_on_complete();
   }
-  
-  private:
-  typedef NativeOpBase<xpu> Parent;
-  inline void _InitProposalEntry(const std::vector<TBlob> &tblob_vec,
-                               const std::vector<real_t*> &vec,
-                               int tag,
-                               uint64_t *idx) {
-    for (size_t i = 0; i < vec.size(); ++i) {
-      ptrs_[*idx] = vec[i];
-      ndims_[*idx] = tblob_vec[i].ndim();
-      shapes_[*idx] = const_cast<index_t*>(tblob_vec[i].shape_.data());
-      tags_[*idx] = tag;
-      ++(*idx);
-    }
-  }
-  inline void _InitProposalForward(const std::vector<TBlob> &in_data,
-                                 const std::vector<TBlob> &out_data,
-                                 const std::vector<TBlob> &aux_args) {
-    uint64_t size = in_data.size() + out_data.size();
-    ptrs_.resize(size);
-    ndims_.resize(size);
-    shapes_.resize(size);
-    tags_.resize(size);
-    uint64_t idx = 0;
-    _InitProposalEntry(in_data, Parent::in_data_ptr_, 0, &idx);
-    _InitProposalEntry(out_data, Parent::out_data_ptr_, 1, &idx);
-    // _InitNativeEntry(aux_args, aux_args_ptr_, 4, &idx);
-  }
-
 
  private:
   ProposalParam param_;
-  std::vector<real_t*> ptrs_;
-  std::vector<int> ndims_;
-  std::vector<unsigned*> shapes_;
-  std::vector<int> tags_;
+  typedef NativeOpBase<xpu> Parent;
 };  // class ProposalOp
 
 template<typename xpu>
