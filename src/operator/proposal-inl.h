@@ -279,7 +279,7 @@ class ProposalProp : public OperatorProperty {
     out_shape->clear();
     out_shape->push_back(Shape2(param_.rpn_post_nms_top_n, 5));
     out_shape->push_back(Shape2(dshape[1] / 2 * dshape[2] * dshape[3], 5));
-    out_shape->push_back(Shape2(5, dshape[1] / 2 * dshape[2] * dshape[3]));
+    out_shape->push_back(Shape2(4, dshape[1] / 2 * dshape[2] * dshape[3]));
     return true;
   }
 

@@ -241,7 +241,7 @@ inline void GenerateAnchors(const std::vector<float>& base_anchor,
                             const std::vector<float>& scales,
                             mshadow::Tensor<cpu, 2>* out_anchors) {
   CHECK_GE(out_anchors->size(0), ratios.size() * scales.size());
-  CHECK_EQ(out_anchors->size(1), 4);
+  CHECK_GE(out_anchors->size(1), 4);
   size_t i = 0;
   for (size_t j = 0; j < ratios.size(); ++j) {
     for (size_t k = 0; k < scales.size(); ++k) {
@@ -300,8 +300,8 @@ inline void BBoxTransform(const mshadow::Tensor<cpu, 2>& ex_rois,
 inline void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
                       const mshadow::Tensor<cpu, 4>& deltas,
                       mshadow::Tensor<cpu, 2> *out_pred_boxes) {
-  CHECK_EQ(boxes.size(1), 4);
-  CHECK_EQ(out_pred_boxes->size(1), 4);
+  CHECK_GE(boxes.size(1), 4);
+  CHECK_GE(out_pred_boxes->size(1), 4);
   size_t anchors = deltas.size(1)/4;
   size_t heights = deltas.size(2);
   size_t widths = deltas.size(3);
@@ -335,7 +335,7 @@ inline void BBoxTransformInv(const mshadow::Tensor<cpu, 2>& boxes,
 }
 
 inline void ClipBoxes(const mshadow::Shape<2>& im_shape, mshadow::Tensor<cpu, 2> *in_out_boxes) {
-  CHECK_EQ(in_out_boxes->size(1), 4);
+  CHECK_GE(in_out_boxes->size(1), 4);
   size_t num_boxes = in_out_boxes->size(0);
 
   for (size_t i=0; i < num_boxes; ++i) {
