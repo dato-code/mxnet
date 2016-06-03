@@ -25,6 +25,7 @@ namespace op {
 namespace proposal {
 enum ProposalOpInputs {kClsProb, kBBoxPred, kImInfo};
 enum ProposalOpOutputs {kOut, kTempProposal, kTempNMS};
+enum ProposalOpResource {kTempSpace};
 }  // proposal
 
 struct AnchorInfo {
@@ -297,6 +298,11 @@ class ProposalProp : public OperatorProperty {
     const std::vector<int> &in_data,
     const std::vector<int> &out_data) const override {
     return {};
+  }
+
+  std::vector<ResourceRequest> ForwardResource(
+    const std::vector<TShape> &in_shape) const override {
+    return {ResourceRequest::kTempSpace};
   }
 
   int NumVisibleOutputs() const override {
