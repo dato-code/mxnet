@@ -130,7 +130,7 @@ inline void NonMaximumSuppression(const mshadow::Tensor<cpu, 2> &dets,
                                   index_t *out_size) {
   CHECK_EQ(dets.shape_[1], 5) << "dets: [x1, y1, x2, y2, score]";
   CHECK_EQ(dets.shape_[0], tempspace->shape_[1]);
-  CHECK_EQ(tempspace->shape_[0], 4);
+  CHECK_GE(tempspace->shape_[0], 4);
   CHECK_GT(dets.shape_[0], 0);
   CHECK_EQ(dets.CheckContiguous(), true);
   CHECK_EQ(tempspace->CheckContiguous(), true);

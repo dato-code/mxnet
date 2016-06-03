@@ -34,7 +34,7 @@ else(MSVC)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++11"   SUPPORT_CXX11)
   check_cxx_compiler_flag("-msse2"       SUPPORT_MSSE2)
-  set(CMAKE_C_FLAGS "-O3 -Wall -msse2 -Wno-unknown-pragmas -fPIC")
+  set(CMAKE_C_FLAGS "-Wall -msse2 -Wno-unknown-pragmas -fPIC")
   set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
 endif(MSVC)
 
