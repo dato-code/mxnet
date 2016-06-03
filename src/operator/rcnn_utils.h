@@ -240,7 +240,7 @@ inline void GenerateAnchors(const std::vector<float>& base_anchor,
                             const std::vector<float>& ratios,
                             const std::vector<float>& scales,
                             mshadow::Tensor<cpu, 2>* out_anchors) {
-  CHECK_EQ(out_anchors->size(0), ratios.size() * scales.size());
+  CHECK_GE(out_anchors->size(0), ratios.size() * scales.size());
   CHECK_EQ(out_anchors->size(1), 4);
   size_t i = 0;
   for (size_t j = 0; j < ratios.size(); ++j) {
