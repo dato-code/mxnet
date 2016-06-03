@@ -139,6 +139,7 @@ class ProposalOp : public NativeOpBase<xpu> {
     Stream<xpu> *s = ctx.get_stream<xpu>();
     Parent::_InitForward(ctx, in_data, out_data, aux_states);
     Parent::_SyncData(in_data, Parent::in_data_ptr_, s, nativeop::kTensorToData);
+    if (s != NULL) s->Wait();
     this->_InitProposalForward(in_data, out_data, aux_states);
  
     size_t num_anchors = in_data[0].shape_[1] / 2;
@@ -241,6 +242,8 @@ class ProposalOp : public NativeOpBase<xpu> {
       }
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
+    if (s != NULL) s->Wait();
+    ctx.async_on_complete();
   }
   
   private:
