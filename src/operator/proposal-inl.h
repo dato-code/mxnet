@@ -230,12 +230,12 @@ class ProposalOp : public NativeOpBase<xpu> {
                           &output,
                           &out_size);
 
-    for (index_t i = 0; i < out_size; ++i) {
+    for (index_t i = 0; i < out.size(0); ++i) {
       index_t index = output[i];
       //batch index 0
-      out[i][0] = 0;
-      for (index_t j = 1; j < 5; ++j) {
-        out[i][j] = workspace_proposals[index][j];
+      out[i][0] = 0; 
+      for (index_t j = 0; j < 4; ++j) {
+        out[i][j + 1] =  workspace_proposals[index][j];
       }
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
@@ -278,7 +278,7 @@ class ProposalProp : public OperatorProperty {
     SHAPE_ASSIGN_CHECK(*in_shape, proposal::kImInfo, im_info_shape);
     out_shape->clear();
     out_shape->push_back(Shape2(param_.rpn_post_nms_top_n, 5));
-    out_shape->push_back(Shape2(dshape[1] / 2 * dshape[2] * dshape[3], 5));
+    out_shape->push_back(Shape2((dshape[1] / 2) * dshape[2] * dshape[3], 5));
     out_shape->push_back(Shape2(5, dshape[1] / 2 * dshape[2] * dshape[3]));
     return true;
   }

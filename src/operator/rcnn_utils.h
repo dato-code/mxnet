@@ -228,8 +228,8 @@ inline void _Transform(float scale,
   float y_ctr = base_anchor[1] + 0.5 * (h-1);
   float size = w * h;
   float size_ratios = std::floor(size / ratio);
-  float new_w = int(std::sqrt(size_ratios) + 0.5) * scale;
-  float new_h = int(new_w / scale * ratio + 0.5) * scale;
+  float new_w = std::floor(std::sqrt(size_ratios) + 0.5) * scale;
+  float new_h = std::floor((new_w / scale * ratio) + 0.5) * scale;
 
   _MakeAnchor(new_w, new_h, x_ctr,
              y_ctr, out_anchor);
