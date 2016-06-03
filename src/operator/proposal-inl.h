@@ -158,11 +158,11 @@ class ProposalOp : public NativeOpBase<xpu> {
                             out_data[0].shape_[1],
                             out_data[0].shape_[2]);
 
-    Shape<2> workspace_proposals_shape = Shape2(in_data[1].shape_[0],
-                                                in_data[1].shape_[1]);
+    Shape<2> workspace_proposals_shape = Shape2(out_data[1].shape_[0],
+                                                out_data[1].shape_[1]);
 
-    Shape<2> workspace_nms_shape = Shape2(in_data[2].shape_[0],
-                                          in_data[2].shape_[1]);
+    Shape<2> workspace_nms_shape = Shape2(out_data[2].shape_[0],
+                                          out_data[2].shape_[1]);
 
 
 
