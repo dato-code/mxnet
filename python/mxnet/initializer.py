@@ -42,6 +42,8 @@ class Initializer(object):
         elif name.endswith("moving_mean"):
             self._init_zero(name, arr)
         elif name.endswith("moving_var"):
+            self._init_one(name, arr)
+        elif name.endswith("moving_inv_var"):
             self._init_zero(name, arr)
         elif name.endswith("moving_inv_var"):
             self._init_zero(name, arr)
@@ -63,6 +65,9 @@ class Initializer(object):
 
     def _init_zero(self, _, arr):
         arr[:] = 0.0
+
+    def _init_one(self, _, arr):
+        arr[:] = 1.0
 
     def _init_bias(self, _, arr):
         arr[:] = 0.0
@@ -234,8 +239,11 @@ class Xavier(Initializer):
 
     def _init_weight(self, _, arr):
         shape = arr.shape
-        fan_in, fan_out = np.prod(shape[1:]), shape[0]
-        factor = 1
+        hw_scale = 1.
+        if len(shape) > 2:
+            hw_scale = np.prod(shape[2:])
+        fan_in, fan_out = shape[1] * hw_scale, shape[0] * hw_scale
+        factor = 1.
         if self.factor_type == "avg":
             factor = (fan_in + fan_out) / 2.0
         elif self.factor_type == "in":

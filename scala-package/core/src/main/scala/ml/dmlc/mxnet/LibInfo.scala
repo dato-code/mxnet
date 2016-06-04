@@ -61,8 +61,11 @@ class LibInfo {
                             handles: Array[NDArrayHandle],
                             keys: Array[String]): Int
   @native def mxNDArrayGetContext(handle: NDArrayHandle, devTypeId: RefInt, devId: RefInt): Int
+  @native def mxNDArraySaveRawBytes(handle: NDArrayHandle, buf: ArrayBuffer[Byte]): Int
+  @native def mxNDArrayLoadFromRawBytes(bytes: Array[Byte], handle: NDArrayHandleRef): Int
 
   // KVStore Server
+  @native def mxInitPSEnv(keys: Array[String], values: Array[String]): Int
   @native def mxKVStoreRunServer(handle: KVStoreHandle, controller: KVServerControllerCallback): Int
 
   // KVStore
@@ -176,6 +179,7 @@ class LibInfo {
                                  complete: RefInt): Int
   @native def mxSymbolGetOutput(handle: SymbolHandle, index: Int, out: SymbolHandleRef): Int
   @native def mxSymbolSaveToJSON(handle: SymbolHandle, out: RefString): Int
+  @native def mxSymbolCreateFromJSON(json: String, handle: SymbolHandleRef): Int
   // scalastyle:off parameterNum
   @native def mxExecutorBindX(handle: SymbolHandle,
                               deviceTypeId: Int,

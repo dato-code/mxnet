@@ -327,7 +327,7 @@ void GraphExecutor::InitGraph(const Symbol &symbol,
   for (const auto& head : graph_.heads) {
     head_nodes.push_back(head.source_id);
   }
-  std::vector<uint32_t> fwd_nodes = graph_.PostDFSOrder(head_nodes, std::unordered_set<uint32_t>());
+  std::vector<uint32_t> fwd_nodes = graph_.PostDFSOrder(head_nodes);
   num_forward_nodes_ = fwd_nodes.size();
 
   std::unordered_set<uint32_t> fwd_set(fwd_nodes.begin(), fwd_nodes.end());
@@ -351,7 +351,26 @@ void GraphExecutor::InitGraph(const Symbol &symbol,
   }
   std::unordered_set<uint32_t> finished(fwd_nodes.begin(), fwd_nodes.end());
   for (uint32_t nid : backward) {
-    std::vector<uint32_t> pass = graph_.PostDFSOrder({nid}, finished);
+    std::vector<uint32_t> pass;
+    graph::PostOrderDFSVisit<uint32_t, uint32_t>(
+      {nid},
+      [&](uint32_t n) { if (finished.count(n) == 0) {
+          pass.push_back(n);
+        }},  // FVisit
+      [](uint32_t n)->uint32_t { return n; },  // HashFunc
+      [=](uint32_t n)->uint32_t {  // InDegree
+        if (finished.count(n) == 1) { return 0; }
+        const StaticGraph::Node& node = graph_.nodes[n];
+        return node.inputs.size() + static_cast<uint32_t>(node.is_backward());
+      },
+      [=](uint32_t n, uint32_t index)->uint32_t {  // GetInput
+        const StaticGraph::Node& node = graph_.nodes[n];
+        if (index < node.inputs.size()) {
+          return node.inputs.at(index).source_id;
+        } else {
+          return node.backward_source_id;
+        }
+      });
     topo_order_.insert(topo_order_.end(), pass.begin(), pass.end());
     finished.insert(pass.begin(), pass.end());
   }
@@ -904,8 +923,8 @@ void GraphExecutor::PartialForward(bool is_train, int step, int *step_left) {
 void GraphExecutor::Backward(const std::vector<NDArray> &head_grads) {
   if (head_grads.size() != 0) {
     // TODO(bing, min): consider pass a map for backward
-    CHECK_EQ(head_grad_nodes_.size(), head_grads.size());
-    for (size_t i = 0; i < head_grad_nodes_.size(); ++i) {
+    CHECK_GE(head_grad_nodes_.size(), head_grads.size());
+    for (size_t i = 0; i < head_grads.size(); ++i) {
       uint32_t nid = head_grad_nodes_[i];
       CHECK(graph_.nodes[nid].is_variable());
       DataEntryInfo &info = op_nodes_[nid].outputs[0];
@@ -914,16 +933,15 @@ void GraphExecutor::Backward(const std::vector<NDArray> &head_grads) {
       CHECK(op_nodes_[nid].ctx == head_grads[i].ctx())
           << "Head Gradient context do not match the context of output op";
     }
-  } else {
-    // check all the head_grad_nodes need to have zero ref_count
-    // loss function do not need out_grad
-    for (size_t i = 0; i < head_grad_nodes_.size(); ++i) {
-      uint32_t nid = head_grad_nodes_[i];
-      DataEntryInfo &info = op_nodes_[nid].outputs[0];
-      CHECK_EQ(info.ref_count, 0)
-          << "Because the last operator is not Loss function, "
-          << "head_gradient is required in calling backward.";
-    }
+  }
+  // check all the head_grad_nodes need to have zero ref_count
+  // loss function do not need out_grad
+  for (size_t i = head_grads.size(); i < head_grad_nodes_.size(); ++i) {
+    uint32_t nid = head_grad_nodes_[i];
+    DataEntryInfo &info = op_nodes_[nid].outputs[0];
+    CHECK_EQ(info.ref_count, 0)
+        << "Because the last operator is not Loss function, "
+        << "head_gradient is required in calling backward.";
   }
   RunOps(true, num_forward_nodes_, topo_order_.size());
 }

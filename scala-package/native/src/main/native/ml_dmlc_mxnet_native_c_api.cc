@@ -139,6 +139,39 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxFuncInvoke
   return ret;
 }
 
+JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxNDArraySaveRawBytes
+  (JNIEnv *env, jobject obj, jlong ndArrayPtr, jobject dataBuf) {
+  size_t length;
+  const char *pdata;
+  int ret = MXNDArraySaveRawBytes(reinterpret_cast<NDArrayHandle>(ndArrayPtr), &length, &pdata);
+
+  // fill dataBuf
+  jclass byteClass = env->FindClass("java/lang/Byte");
+  jmethodID newByte = env->GetMethodID(byteClass, "<init>", "(B)V");
+  jclass arrayClass = env->FindClass("scala/collection/mutable/ArrayBuffer");
+  jmethodID arrayAppend = env->GetMethodID(arrayClass,
+    "$plus$eq", "(Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;");
+  for (size_t i = 0; i < length; ++i) {
+    jobject data = env->NewObject(byteClass, newByte, static_cast<jbyte>(pdata[i]));
+    env->CallObjectMethod(dataBuf, arrayAppend, data);
+    env->DeleteLocalRef(data);
+  }
+
+  return ret;
+}
+
+JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxNDArrayLoadFromRawBytes
+  (JNIEnv *env, jobject obj, jbyteArray bytes, jobject handleRef) {
+  int size = env->GetArrayLength(bytes);
+  jbyte *byteArr = env->GetByteArrayElements(bytes, NULL);
+  NDArrayHandle out;
+  int ret = MXNDArrayLoadFromRawBytes(reinterpret_cast<const void *>(byteArr),
+                                      static_cast<size_t>(size), &out);
+  env->ReleaseByteArrayElements(bytes, byteArr, 0);
+  SetLongField(env, handleRef, reinterpret_cast<jlong>(out));
+  return ret;
+}
+
 JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxNDArrayGetShape
   (JNIEnv *env, jobject obj, jlong ndArrayPtr, jobject ndimRef, jobject dataBuf) {
   mx_uint ndim;
@@ -286,6 +319,46 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxNDArraySave
     }
     delete[] keys;
   }
+
+  return ret;
+}
+
+JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxInitPSEnv
+  (JNIEnv *env, jobject obj, jobjectArray jkeys, jobjectArray jvals) {
+  // keys and values
+  int paramSize = env->GetArrayLength(jkeys);
+  const char** keys = new const char*[paramSize];
+  const char** vals = new const char*[paramSize];
+  jstring jkey, jval;
+  // use strcpy and release char* created by JNI inplace
+  for (size_t i = 0; i < paramSize; i++) {
+    jkey = reinterpret_cast<jstring>(env->GetObjectArrayElement(jkeys, i));
+    const char* ckey = env->GetStringUTFChars(jkey, 0);
+    keys[i] = ckey;
+    env->DeleteLocalRef(jkey);
+
+    jval = reinterpret_cast<jstring>(env->GetObjectArrayElement(jvals, i));
+    const char* cval = env->GetStringUTFChars(jval, 0);
+    vals[i] = cval;
+    env->DeleteLocalRef(jval);
+  }
+
+  int ret = MXInitPSEnv(static_cast<mx_uint>(paramSize),
+                        static_cast<const char**>(keys),
+                        static_cast<const char**>(vals));
+
+  // release keys and vals
+  for (size_t i = 0; i < paramSize; i++) {
+    jstring key = reinterpret_cast<jstring>(env->GetObjectArrayElement(jkeys, i));
+    env->ReleaseStringUTFChars(key, keys[i]);
+    env->DeleteLocalRef(key);
+
+    jstring value = reinterpret_cast<jstring>(env->GetObjectArrayElement(jvals, i));
+    env->ReleaseStringUTFChars(value, vals[i]);
+    env->DeleteLocalRef(value);
+  }
+  delete[] keys;
+  delete[] vals;
 
   return ret;
 }
@@ -1070,6 +1143,16 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxSymbolSaveToJSON
   const char *out;
   int ret = MXSymbolSaveToJSON(reinterpret_cast<SymbolHandle>(symbolPtr), &out);
   SetStringField(env, jout, out);
+  return ret;
+}
+
+JNIEXPORT jint JNICALL Java_ml_dmlc_mxnet_LibInfo_mxSymbolCreateFromJSON
+  (JNIEnv *env, jobject obj, jstring json, jobject jhandleRef) {
+  const char *str = env->GetStringUTFChars(json, 0);
+  SymbolHandle out;
+  int ret = MXSymbolCreateFromJSON(str, &out);
+  SetLongField(env, jhandleRef, reinterpret_cast<jlong>(out));
+  env->ReleaseStringUTFChars(json, str);
   return ret;
 }
 

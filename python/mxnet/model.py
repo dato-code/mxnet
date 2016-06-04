@@ -6,7 +6,6 @@ from __future__ import absolute_import
 import numpy as np
 import time
 import logging
-import json
 from . import io
 from . import nd
 from . import symbol as sym
@@ -352,6 +351,7 @@ def load_checkpoint(prefix, epoch):
         Prefix of model name.
     epoch : int
         Epoch number of model we would like to load.
+
     Returns
     -------
     symbol : Symbol
@@ -413,7 +413,7 @@ class FeedForward(BASE_ESTIMATOR):
         contain extra parameters than needed.
     begin_epoch : int, optional
         The begining training epoch.
-    **kwargs : dict
+    kwargs : dict
         The additional keyword arguments passed to optimizer.
     """
     def __init__(self, symbol, ctx=None,
@@ -653,7 +653,6 @@ class FeedForward(BASE_ESTIMATOR):
 
     def score(self, X, eval_metric='acc', num_batch=None, batch_end_callback=None, reset=True):
         """Run the model on X and calculate the score with eval_metric
-
         Parameters
         ----------
         X : mxnet.DataIter
@@ -661,7 +660,6 @@ class FeedForward(BASE_ESTIMATOR):
             The metric for calculating score
         num_batch : int or None
             the number of batch to run. Go though all batches if None
-
         Returns
         -------
         s : float
@@ -730,22 +728,20 @@ class FeedForward(BASE_ESTIMATOR):
             A callback that is invoked at end of each batch
             For print purpose
         kvstore: KVStore or str, optional
-            The KVStore or a string kvstore type:
-
-            * 'local' : multi-devices on a single machine, will automatically
-              choose one from 'local_update_cpu', 'local_allreduce_cpu', and
-              'local_allreduce_device'
-            * 'dist_sync' : multi-machines with BSP
-            * 'dist_async' : multi-machines with partical asynchronous
-
-            In default uses 'local', often no need to change for single machiine.
+           The KVStore or a string kvstore type: 'local', 'dist_sync', 'dist_async'
+           In default uses 'local', often no need to change for single machiine.
         logger : logging logger, optional
             When not specified, default logger will be used.
         work_load_list : float or int, optional
             The list of work load for different devices,
             in the same order as ctx
-        monitor : :class:`monitor.Monitor`
-            Monitoring weights and gradients.
+
+        Note
+        ----
+        KVStore behavior
+        - 'local', multi-devices on a single machine, will automatically choose best type.
+        - 'dist_sync', multi-machines with BSP
+        - 'dist_async', multi-machines with partical asynchronous
         """
 
         data = self._init_iter(X, y, is_train=True)
@@ -754,10 +750,15 @@ class FeedForward(BASE_ESTIMATOR):
         if self.sym_gen:
             self.symbol = self.sym_gen(data.default_bucket_key) # pylint: disable=no-member
             self._check_arguments()
+        self.kwargs["sym"] = self.symbol
 
         arg_names, param_names, aux_names = \
                 self._init_params(dict(data.provide_data+data.provide_label))
-        self.kwargs["arg_names"] = arg_names
+        param_idx2name = {}
+        for i, n in enumerate(param_names):
+            for k in range(len(self.ctx)):
+                param_idx2name[i*len(self.ctx)+k] = n
+        self.kwargs["param_idx2name"] = param_idx2name
 
         # setup metric
         if not isinstance(eval_metric, metric.EvalMetric):
@@ -805,10 +806,6 @@ class FeedForward(BASE_ESTIMATOR):
         ----------
         prefix : str
             Prefix of model name.
-
-        See Also
-        --------
-        Symbol.load : the method to load the model back.
 
         Notes
         -----
@@ -895,15 +892,8 @@ class FeedForward(BASE_ESTIMATOR):
             A callback that is invoked at end of each batch
             For print purpose
         kvstore: KVStore or str, optional
-            The KVStore or a string kvstore type:
-
-            * 'local' : multi-devices on a single machine, will automatically
-              choose one from 'local_update_cpu', 'local_allreduce_cpu', and
-              'local_allreduce_device'
-            * 'dist_sync' : multi-machines with BSP
-            * 'dist_async' : multi-machines with partical asynchronous
-
-            In default uses 'local', often no need to change for single machiine.
+           The KVStore or a string kvstore type: 'local', 'dist_sync', 'dis_async'
+           In default uses 'local', often no need to change for single machiine.
         logger : logging logger, optional
             When not specified, default logger will be used.
         work_load_list : list of float or int, optional

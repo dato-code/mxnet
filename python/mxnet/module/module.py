@@ -48,10 +48,16 @@ class Module(BaseModule):
 
         self._symbol = symbol
 
+        data_names = list(data_names)
+        label_names = list(label_names) if label_names is not None else []
+
         arg_names = symbol.list_arguments()
         input_names = data_names + label_names
         self._param_names = [x for x in arg_names if x not in input_names]
         self._aux_names = symbol.list_auxiliary_states()
+        self._data_names = data_names
+        self._label_names = label_names
+        self._output_names = symbol.list_outputs()
 
         self._arg_params = None
         self._aux_params = None
@@ -72,6 +78,16 @@ class Module(BaseModule):
         self._exec_group = None
         self._data_shapes = None
         self._label_shapes = None
+
+    @property
+    def data_names(self):
+        """A list of names for data required by this module."""
+        return self._data_names
+
+    @property
+    def output_names(self):
+        """A list of names for the outputs of this module."""
+        return self._output_names
 
     @property
     def data_shapes(self):
@@ -154,17 +170,21 @@ class Module(BaseModule):
             """Internal helper for parameter initialization"""
             if cache is not None:
                 if cache.has_key(name):
-                    cache[name].copyto(arr)
+                    cache_arr = cache[name]
+
+                    # just in case the cached array is just the target itself
+                    if cache_arr is not arr:
+                        cache_arr.copyto(arr)
                 else:
                     assert allow_missing
                     initializer(name, arr)
             else:
                 initializer(name, arr)
 
-        for name, arr in self._arg_params.iteritems():
+        for name, arr in self._arg_params.items():
             _impl(name, arr, arg_params)
 
-        for name, arr in self._aux_params.iteritems():
+        for name, arr in self._aux_params.items():
             _impl(name, arr, aux_params)
 
         self.params_initialized = True
@@ -214,7 +234,10 @@ class Module(BaseModule):
         if not for_training:
             assert not inputs_need_grad
         else:
-            assert label_shapes is not None
+            pass
+            # this is not True, as some module might not contains a loss function
+            # that consumes the labels
+            # assert label_shapes is not None
 
         self._data_shapes = data_shapes
         self._label_shapes = label_shapes
@@ -230,7 +253,7 @@ class Module(BaseModule):
                                                      self._work_load_list, data_shapes,
                                                      label_shapes, self._param_names,
                                                      for_training, inputs_need_grad,
-                                                     shared_group)
+                                                     shared_group, logger=self.logger)
 
         if shared_module is not None:
             self.params_initialized = True
@@ -275,8 +298,16 @@ class Module(BaseModule):
             batch_size = self._exec_group.batch_size
             if kvstore and kvstore.type == 'dist_sync':
                 batch_size *= kvstore.num_workers
-            optimizer = opt.create(optimizer, rescale_grad=(1.0/batch_size),
-                                   **dict(optimizer_params))
+            idx2name = {}
+            for k in range(len(self._context)):
+                idx2name.update({i*len(self._context)+k: n
+                                 for i, n in enumerate(self._exec_group.param_names)})
+            optimizer_params = dict(optimizer_params)
+            if 'rescale_grad' not in optimizer_params:
+                optimizer_params['rescale_grad'] = 1.0/batch_size
+            optimizer = opt.create(optimizer,
+                                   sym=self.symbol, param_idx2name=idx2name,
+                                   **optimizer_params)
         else:
             assert isinstance(optimizer, opt.Optimizer)
 

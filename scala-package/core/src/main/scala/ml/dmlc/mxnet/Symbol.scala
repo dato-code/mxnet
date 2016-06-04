@@ -1,7 +1,7 @@
 package ml.dmlc.mxnet
 
 import ml.dmlc.mxnet.Base._
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
@@ -15,6 +15,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
  */
 // scalastyle:off finalize
 class Symbol private(private[mxnet] val handle: SymbolHandle) {
+  private val logger: Logger = LoggerFactory.getLogger(classOf[Symbol])
   private var disposed = false
 
   override protected def finalize(): Unit = {
@@ -754,8 +755,7 @@ object Symbol {
   }
 
   def pow[@specialized(Int, Float, Double) V](number: V, sym: Symbol): Symbol = {
-    Symbol.createFromListedSymbols("_PowerScalar")(Array(sym),
-      Map("scalar" -> number.toString, "scalar_on_left" -> "True"))
+    Symbol.createFromListedSymbols("_RPowerScalar")(Array(sym), Map("scalar" -> number.toString))
   }
 
   /**
@@ -804,6 +804,14 @@ object Symbol {
    */
   def square(src: Symbol): Symbol = {
     createFromListedSymbols("square")(Array(src))
+  }
+
+  /**
+   * Take sum of the src
+   * @param src Source symbolic input to the function
+   */
+  def sum(src: Symbol): Symbol = {
+    createFromListedSymbols("sum")(Array(src))
   }
 
   /**
@@ -863,8 +871,7 @@ object Symbol {
   }
 
   def max[@specialized(Int, Float, Double) V](left: V, right: Symbol): Symbol = {
-    createFromListedSymbols("_MaximumScalar")(Array(right),
-      Map("scalar" -> left.toString, "scalar_on_left" -> "True"))
+    createFromListedSymbols("_MaximumScalar")(Array(right), Map("scalar" -> left.toString))
   }
 
   def min(left: Symbol, right: Symbol): Symbol = {
@@ -876,8 +883,7 @@ object Symbol {
   }
 
   def min[@specialized(Int, Float, Double) V](left: V, right: Symbol): Symbol = {
-    createFromListedSymbols("_MinimumScalar")(Array(right),
-      Map("scalar" -> left.toString, "scalar_on_left" -> "True"))
+    createFromListedSymbols("_MinimumScalar")(Array(right), Map("scalar" -> left.toString))
   }
 
   /**
@@ -1512,6 +1518,18 @@ object Symbol {
     checkCall(_LIB.mxSymbolCreateFromFile(fname, handle))
     new Symbol(handle.value)
   }
+
+  /**
+   * Load symbol from json string.
+   * @param json A json string.
+   * @return The loaded symbol.
+   * @see Symbol.tojson : Used to save symbol into json string.
+   */
+  def loadJson(json: String): Symbol = {
+    val handle = new SymbolHandleRef
+    checkCall(_LIB.mxSymbolCreateFromJSON(json, handle))
+    new Symbol(handle.value)
+  }
 }
 
 private case class SymbolFunction(handle: SymbolHandle, keyVarNumArgs: String)
@@ -1528,8 +1546,8 @@ class SymbolConversions[@specialized(Int, Float, Double) V](val value: V) {
   }
 
   def -(other: Symbol): Symbol = {
-    Symbol.createFromListedSymbols("_MinusScalar")(Array(other),
-      Map("scalar" -> value.toString, "scalar_on_left" -> "True"))
+    Symbol.createFromListedSymbols("_RMinusScalar")(
+      Array(other), Map("scalar" -> value.toString))
   }
 
   def *(other: Symbol): Symbol = {
@@ -1537,7 +1555,7 @@ class SymbolConversions[@specialized(Int, Float, Double) V](val value: V) {
   }
 
   def /(other: Symbol): Symbol = {
-    Symbol.createFromListedSymbols("_DivScalar")(Array(other),
-      Map("scalar" -> value.toString, "scalar_on_left" -> "True"))
+    Symbol.createFromListedSymbols("_RDivScalar")(
+      Array(other), Map("scalar" -> value.toString))
   }
 }
