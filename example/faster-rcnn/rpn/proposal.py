@@ -1,87 +1,75 @@
-# --------------------------------------------------------
-# Faster R-CNN
-# Copyright (c) 2015 Microsoft
-# Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick and Sean Bell
-# Modification by Bing Xu
-# --------------------------------------------------------
-
-import sys
-sys.path.insert(0, "../../python/")
-
 import mxnet as mx
 import numpy as np
 
-from helper.config import cfg
-from helper.generate_anchors import generate_anchors
-from helper.bbox_transform import bbox_transform_inv, clip_boxes
-from helper.nms_wrapper import nms
+
+from rcnn.config import cfg
+from helper.processing.generate_anchors import generate_anchors
+from helper.processing.bbox_transform import bbox_transform_inv, clip_boxes
+from helper.processing.nms import nms
 
 
-def _filter_boxes(boxes, min_size):
-    """Remove all boxes with any side smaller than min_size."""
-    ws = boxes[:, 2] - boxes[:, 0] + 1
-    hs = boxes[:, 3] - boxes[:, 1] + 1
-    keep = np.where((ws >= min_size) & (hs >= min_size))[0]
-    return keep
+DEBUG = False
 
-class ProposalLayer(mx.operator.NumpyOp):
-    def __init__(self, feat_stride, scales, is_train=False):
-        super(ProposalLayer, self).__init__(need_top_grad=False)
+class ProposalOperator(mx.operator.NumpyOp):
+    def __init__(self, scales=(8, 16, 32), feat_stride=16, phase='TRAIN'):
+        super(ProposalOperator, self).__init__(False)
+
         self._feat_stride = feat_stride
         anchor_scales = scales
         self._anchors = generate_anchors(scales=np.array(anchor_scales))
         self._num_anchors = self._anchors.shape[0]
-        if is_train == True:
-            self.cfg_key = 'TRAIN'
-        else:
-            self.cfg_key = 'TEST'
+        self.phase = phase
+
+        if DEBUG:
+            print 'feat_stride: {}'.format(self._feat_stride)
+            print 'anchors:'
+            print self._anchors
 
 
     def list_arguments(self):
         return ['rpn_cls_prob', 'rpn_bbox_pred', 'im_info']
 
     def list_outputs(self):
-        return ['output']
+        if self.phase == 'TRAIN':
+            return ["rpn_rois", "roi_pad"]
+        else:
+            return ["rpn_rois"]
 
     def infer_shape(self, in_shape):
-        cfg_key = self.cfg_key
-        rpn_cls_prob_shape = in_shape[0]
-        rpn_bbox_pred_shape = in_shape[1]
-        assert(rpn_cls_prob_shape[0] == rpn_bbox_pred_shape[0])
-        if rpn_cls_prob_shape[0] > 1:
-            raise ValueError("Only single item batches are supported")
-
-        batch_size = rpn_cls_prob_shape[0]
-        im_info_shape = (batch_size, 3)
-
-        output_shape = (1, cfg[cfg_key].RPN_POST_NMS_TOP_N, 5)
-        return [rpn_cls_prob_shape, rpn_bbox_pred_shape, im_info_shape], [output_shape]
+        rpn_cls_prob_reshape_shape = in_shape[0]
+        output_shape = (cfg[self.phase].RPN_POST_NMS_TOP_N, 5)
+        output_pad = (1,)
+        if self.phase == 'TRAIN':
+            return in_shape, [output_shape, output_pad]
+        else:
+            return in_shape, [output_shape]
 
     def forward(self, in_data, out_data):
-        # assume need to get context in future
-        cfg_key = self.cfg_key
+        cfg_key = str(self.phase)
         pre_nms_topN  = cfg[cfg_key].RPN_PRE_NMS_TOP_N
         post_nms_topN = cfg[cfg_key].RPN_POST_NMS_TOP_N
         nms_thresh    = cfg[cfg_key].RPN_NMS_THRESH
         min_size      = cfg[cfg_key].RPN_MIN_SIZE
 
-        # the first set of _num_anchors channels are bg probs
-        # the second set are the fg probs, which we want
         scores = in_data[0][:, self._num_anchors:, :, :]
         bbox_deltas = in_data[1]
         im_info = in_data[2][0, :]
 
-        # 1. Generate proposals from bbox deltas and shifted anchors
+        if DEBUG:
+            print 'im_size: ({}, {})'.format(im_info[0], im_info[1])
+            print 'scale: {}'.format(im_info[2])
+
         height, width = scores.shape[-2:]
+
+        if DEBUG:
+            print 'score map size: {}'.format(scores.shape)
 
         # Enumerate all shifts
         shift_x = np.arange(0, width) * self._feat_stride
         shift_y = np.arange(0, height) * self._feat_stride
         shift_x, shift_y = np.meshgrid(shift_x, shift_y)
         shifts = np.vstack((shift_x.ravel(), shift_y.ravel(),
-            shift_x.ravel(), shift_y.ravel())).transpose()
-
+                            shift_x.ravel(), shift_y.ravel())).transpose()
 
         # Enumerate all shifted anchors:
         #
@@ -92,9 +80,8 @@ class ProposalLayer(mx.operator.NumpyOp):
         A = self._num_anchors
         K = shifts.shape[0]
         anchors = self._anchors.reshape((1, A, 4)) + \
-                shifts.reshape((1, K, 4)).transpose((1, 0, 2))
+                  shifts.reshape((1, K, 4)).transpose((1, 0, 2))
         anchors = anchors.reshape((K * A, 4))
-
 
         # Transpose and reshape predicted bbox transformations to get them
         # into the same order as the anchors:
@@ -146,17 +133,22 @@ class ProposalLayer(mx.operator.NumpyOp):
         # batch inds are 0
         batch_inds = np.zeros((proposals.shape[0], 1), dtype=np.float32)
         blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
-        out_data[0][:] = blob.reshape((1, blob.shape[0], blob.shape[1]))
-        # top[0].reshape(*(blob.shape))
-        # top[0].data[...] = blob
-
-        # [Optional] output scores blob
-        # if len(top) > 1:
-        #     top[1].reshape(*(scores.shape))
-        #     top[1].data[...] = scores
+        roi_pad = np.asarray([post_nms_topN - blob.shape[0]])
+        print "p: roi_pad: ", roi_pad
+        rois = np.zeros((post_nms_topN, 5), dtype="float32")
+        rois[:blob.shape[0], :] = blob
+        out_data[0][:] = rois
+        if self.phase == "TRAIN":
+            out_data[1][:] = roi_pad
 
 
     def backward(self, out_grad, in_data, out_data, in_grad):
-        """This layer does not propagate gradients."""
         pass
 
+
+def _filter_boxes(boxes, min_size):
+    """Remove all boxes with any side smaller than min_size."""
+    ws = boxes[:, 2] - boxes[:, 0] + 1
+    hs = boxes[:, 3] - boxes[:, 1] + 1
+    keep = np.where((ws >= min_size) & (hs >= min_size))[0]
+    return keep

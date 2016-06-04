@@ -89,7 +89,6 @@ def _scale_enum(anchor, scales):
     """
     Enumerate a set of anchors for each scale wrt an anchor.
     """
-
     w, h, x_ctr, y_ctr = _whctrs(anchor)
     ws = w * scales
     hs = h * scales

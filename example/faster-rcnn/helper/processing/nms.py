@@ -1,14 +1,14 @@
-# --------------------------------------------------------
-# Fast R-CNN
-# Copyright (c) 2015 Microsoft
-# Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick
-# --------------------------------------------------------
-
 import numpy as np
 
-def py_cpu_nms(dets, thresh):
-    """Pure Python NMS baseline."""
+
+def nms(dets, thresh):
+    """
+    greedily select boxes with high confidence and overlap with current maximum <= thresh
+    rule out overlap >= thresh
+    :param dets: [[x1, y1, x2, y2 score]]
+    :param thresh: retain overlap < thresh
+    :return: indexes to keep
+    """
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
