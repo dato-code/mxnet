@@ -39,9 +39,9 @@ endif
 CFLAGS += -I./mshadow/ -I./dmlc-core/include -Iinclude $(MSHADOW_CFLAGS)
 LDFLAGS = -pthread $(MSHADOW_LDFLAGS) $(DMLC_LDFLAGS)
 ifeq ($(DEBUG), 1)
-	NVCCFLAGS = -g -G -O0 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
+	NVCCFLAGS = -D_FORCE_INLINES -g -G -O0 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 else
-	NVCCFLAGS = --use_fast_math -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
+	NVCCFLAGS = -D_FORCE_INLINES -g -O3 -ccbin $(CXX) $(MSHADOW_NVCCFLAGS)
 endif
 
 ifndef ROOTDIR
@@ -98,7 +98,7 @@ endif
 
 # SFrame flexible_type
 FLEXIBLE_TYPE = $(ROOTDIR)/flexible_type
-LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a 
+LIB_DEP += $(FLEXIBLE_TYPE)/build/libflexible_type.a
 LDFLAGS += -lpng -ljpeg -lz
 
 # plugins
@@ -139,7 +139,7 @@ else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S), Darwin)
 		SCALA_PKG_PROFILE := osx-x86_64
-	else     
+	else
 		SCALA_PKG_PROFILE := linux-x86_64
 	endif
 endif
@@ -149,6 +149,9 @@ LIB_DEP += $(DMLC_CORE)/libdmlc.a
 ALL_DEP = $(OBJ) $(EXTRA_OBJ) $(PLUGIN_OBJ) $(LIB_DEP)
 ifeq ($(USE_CUDA), 1)
 	ALL_DEP += $(CUOBJ) $(EXTRA_CUOBJ) $(PLUGIN_CUOBJ)
+	SCALA_PKG_PROFILE := $(SCALA_PKG_PROFILE)-gpu
+else
+	SCALA_PKG_PROFILE := $(SCALA_PKG_PROFILE)-cpu
 endif
 
 ifeq ($(USE_NVRTC), 1)
@@ -225,7 +228,7 @@ lint: rcpplint jnilint
 doc: doxygen
 
 doxygen:
-	doxygen doc/Doxyfile
+	doxygen docs/Doxyfile
 
 # R related shortcuts
 rcpplint:

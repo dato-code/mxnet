@@ -42,27 +42,27 @@ require(imager)
 ## Loading required package: stringr
 ## Loading required package: png
 ## Loading required package: jpeg
-## 
+##
 ## Attaching package: 'imager'
-## 
+##
 ## The following object is masked from 'package:magrittr':
-## 
+##
 ##     add
-## 
+##
 ## The following object is masked from 'package:plyr':
-## 
+##
 ##     liply
-## 
+##
 ## The following objects are masked from 'package:stats':
-## 
+##
 ##     convolve, spectrum
-## 
+##
 ## The following object is masked from 'package:graphics':
-## 
+##
 ##     frame
-## 
+##
 ## The following object is masked from 'package:base':
-## 
+##
 ##     save.image
 ```
 
@@ -96,7 +96,7 @@ im <- load.image(system.file("extdata/parrots.png", package="imager"))
 plot(im)
 ```
 
-![plot of chunk unnamed-chunk-5](../web-data/mxnet/knitr/classifyRealImageWithPretrainedModel-unnamed-chunk-5-1.png) 
+![plot of chunk unnamed-chunk-5](../../web-data/mxnet/knitr/classifyRealImageWithPretrainedModel-unnamed-chunk-5-1.png)
 
 Before feeding the image to the deep net, we need to do some preprocessing
 to make the image fit the input requirement of deepnet. The preprocessing
@@ -107,20 +107,18 @@ The preprocessing function:
 
 
 ```r
-preproc.image <-function(im, mean.image) {
+preproc.image <- function(im, mean.image) {
   # crop the image
   shape <- dim(im)
   short.edge <- min(shape[1:2])
-  yy <- floor((shape[1] - short.edge) / 2) + 1
-  yend <- yy + short.edge - 1
-  xx <- floor((shape[2] - short.edge) / 2) + 1
-  xend <- xx + short.edge - 1
-  croped <- im[yy:yend, xx:xend,,]
+  xx <- floor((shape[1] - short.edge) / 2)
+  yy <- floor((shape[2] - short.edge) / 2) 
+  croped <- crop.borders(im, xx, yy)
   # resize to 224 x 224, needed by input of the model.
   resized <- resize(croped, 224, 224)
   # convert to array (x, y, channel)
-  arr <- as.array(resized)
-  dim(arr) = c(224, 224, 3)
+  arr <- as.array(resized) * 255
+  dim(arr) <- c(224, 224, 3)
   # substract the mean
   normed <- arr - mean.img
   # Reshape to format needed by mxnet (width, height, channel, num)

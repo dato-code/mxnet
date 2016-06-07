@@ -3,6 +3,7 @@
 """Executor group is a convenient tool for managing a group of executors."""
 
 import numpy as np
+import logging
 
 from .. import context as ctx
 from .. import ndarray as nd
@@ -14,8 +15,7 @@ def _merge_multi_context(outputs):
     """Merge outputs that lives on multiple context into one, so that they look
     like living on one context.
     """
-    outputs = [np.concatenate([y.asnumpy() for y in x]) for x in outputs]
-    outputs = [nd.array(x) for x in outputs]
+    outputs = [nd.concatenate(x, always_copy=False) for x in outputs]
     return outputs
 
 class DataParallelExecutorGroup(object):
@@ -27,7 +27,7 @@ class DataParallelExecutorGroup(object):
     ----------
     symbol : Symbol
         The common symbolic computation graph for all executors.
-    context : list
+    contexts : list
         A list of contexts.
     workload : list
         If not `None`, could be a list of numbers that specify the workload to be assigned
@@ -55,26 +55,30 @@ class DataParallelExecutorGroup(object):
     input_types : list
         Default is `None`. When not `None`, can be used to specify the data type for each
         of the data/label inputs.
+    logger : Logger
+        Default is `logging`.
     """
-    def __init__(self, symbol, context, workload, data_shapes, label_shapes, param_names,
-                 for_training, inputs_need_grad, shared_group=None, input_types=None):
+    def __init__(self, symbol, contexts, workload, data_shapes, label_shapes, param_names,
+                 for_training, inputs_need_grad, shared_group=None, input_types=None,
+                 logger=logging):
         self.param_names = param_names
         self.arg_names = symbol.list_arguments()
         self.aux_names = symbol.list_auxiliary_states()
 
         self.symbol = symbol
-        self.context = context
+        self.contexts = contexts
         self.workload = workload
 
         self.for_training = for_training
         self.inputs_need_grad = inputs_need_grad
 
         self.input_types = input_types
+        self.logger = logger
 
         if shared_group is not None:
             self.shared_data_arrays = shared_group.shared_data_arrays
         else:
-            self.shared_data_arrays = [{} for _ in context]
+            self.shared_data_arrays = [{} for _ in contexts]
 
         # initialize some instance variables
         self.batch_size = None
@@ -115,7 +119,7 @@ class DataParallelExecutorGroup(object):
         shared_group : DataParallelExecutorGroup
         """
         self.execs = []
-        for i in range(len(self.context)):
+        for i in range(len(self.contexts)):
             self.execs.append(self._bind_ith_exec(i, data_shapes, label_shapes, shared_group))
 
         # convenient data structures
@@ -131,9 +135,12 @@ class DataParallelExecutorGroup(object):
         self.param_arrays = [[exec_.arg_arrays[i] for exec_ in self.execs]
                              for i, name in enumerate(self.arg_names)
                              if name in self.param_names]
-        self.grad_arrays = [[exec_.grad_arrays[i] for exec_ in self.execs]
-                            for i, name in enumerate(self.arg_names)
-                            if name in self.param_names]
+        if self.for_training:
+            self.grad_arrays = [[exec_.grad_arrays[i] for exec_ in self.execs]
+                                for i, name in enumerate(self.arg_names)
+                                if name in self.param_names]
+        else:
+            self.grad_arrays = None
 
         data_names = [x[0] for x in data_shapes]
         if self.inputs_need_grad:
@@ -199,7 +206,14 @@ class DataParallelExecutorGroup(object):
             is_train = self.for_training
 
         if is_train:
-            _load_label(data_batch, self.label_arrays)
+            # It could be the case that even though we are binded for training, we
+            # still do not have label arrays. For example, this could happen if we
+            # are using a module without a loss function (the user will compute the
+            # loss and gradients using some other ways), and we do not need the label
+            # here.
+            if self.label_arrays is not None:
+                _load_label(data_batch, self.label_arrays)
+
         for exec_ in self.execs:
             exec_.forward(is_train=is_train)
 
@@ -271,8 +285,9 @@ class DataParallelExecutorGroup(object):
         if out_grads is None:
             out_grads = []
 
-        for exec_, islice in zip(self.execs, self.slices):
-            out_grads_slice = [grad[islice] for grad in out_grads]
+        for i, (exec_, islice) in enumerate(zip(self.execs, self.slices)):
+            out_grads_slice = [grad[islice].as_in_context(self.contexts[i])
+                               for grad in out_grads]
             exec_.backward(out_grads=out_grads_slice)
 
     def update_metric(self, eval_metric, labels):
@@ -296,7 +311,7 @@ class DataParallelExecutorGroup(object):
         if label_shapes is not None:
             label_shapes = self._sliced_shape(label_shapes, i)
         shared_exec = None if shared_group is None else shared_group.execs[i]
-        context = self.context[i]
+        context = self.contexts[i]
         shared_data_arrays = self.shared_data_arrays[i]
 
         input_shapes = dict(data_shapes)
@@ -329,6 +344,33 @@ class DataParallelExecutorGroup(object):
             else:
                 grad_req[name] = 'null'
 
+        def _get_or_reshape(name, shared_data_arrays, arg_shape, arg_type, context, logger):
+            """Internal helper to get a memory block or re-use by re-shaping"""
+            if name in shared_data_arrays:
+                arg_arr = shared_data_arrays[name]
+
+                if np.prod(arg_arr.shape) >= np.prod(arg_shape):
+                    # nice, we can directly re-use this data blob
+                    assert arg_arr.dtype == arg_type
+                    arg_arr = arg_arr.reshape(arg_shape)
+                else:
+                    logger.warning(('bucketing: data "%s" has a shape %s' % (name, arg_shape)) +
+                                   (', which is larger than already allocated ') +
+                                   ('shape %s' % (arg_arr.shape,)) +
+                                   ('. Need to re-allocate. Consider putting ') +
+                                   ('default_bucket_key to') +
+                                   (' be the bucket taking the largest input for better ') +
+                                   ('memory sharing.'))
+                    arg_arr = nd.zeros(arg_shape, context, dtype=arg_type)
+
+                    # replace existing shared array because the new one is bigger
+                    shared_data_arrays[name] = arg_arr
+            else:
+                arg_arr = nd.zeros(arg_shape, context, dtype=arg_type)
+                shared_data_arrays[name] = arg_arr
+
+            return arg_arr
+
         # create or borrow arguments and gradients
         for j in range(len(self.arg_names)):
             name = self.arg_names[j]
@@ -345,13 +387,14 @@ class DataParallelExecutorGroup(object):
                     if grad_req[name] != 'null':
                         grad_arrays[name] = shared_exec.grad_dict[name]
             else: # data or label
-                if name in shared_data_arrays:
-                    arg_arr = shared_data_arrays[name]
-                    assert arg_arr.shape == arg_shapes[j]
-                    assert arg_arr.dtype == arg_types[j]
-                else:
-                    arg_arr = nd.zeros(arg_shapes[j], context, dtype=arg_types[j])
-                shared_data_arrays[name] = arg_arr
+                arg_arr = _get_or_reshape(name, shared_data_arrays, arg_shapes[j], arg_types[j],
+                                          context, self.logger)
+
+                # data might also need grad if inputs_need_grad is True
+                if grad_req[name] != 'null':
+                    grad_arrays[name] = _get_or_reshape('grad of ' + name, shared_data_arrays,
+                                                        arg_shapes[j], arg_types[j], context,
+                                                        self.logger)
 
             arg_arrays.append(arg_arr)
 

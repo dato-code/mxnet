@@ -1,10 +1,17 @@
-# Introduction
+# Getting Started
 
-Let's start with training a simple
+This is a getting started tutorial of MXNet.
+We will train a
 [multi-layer perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron)
 (MLP) on
 the [MNIST handwritten digit dataset](http://yann.lecun.com/exdb/mnist/) to get
 the basic idea of how to use MXNet.
+
+## Links to Other Resources
+Here are some other resources that can also be helpful
+- See [Installation Guide](../how_to/build.md) on how to install mxnet.
+- See [How to pages](../how_to/index.md) on various tips on using mxnet.
+- See [Tutorials](../tutorials/index.md) on tutorials on specific tasks.
 
 ## Train MLP on MNIST
 
@@ -75,7 +82,7 @@ act1 = mx.symbol.Activation(data = fc1, act_type="relu")
 fc2  = mx.symbol.FullyConnected(data = act1, num_hidden = 64)
 act2 = mx.symbol.Activation(data = fc2, act_type="relu")
 fc3  = mx.symbol.FullyConnected(data = act2, num_hidden=10)
-mlp  = mx.symbol.SoftmaxOutput(data = fc3)
+mlp  = mx.symbol.SoftmaxOutput(data = fc3, name = 'softmax')
 ```
 
 Next we train a model on the data
@@ -94,6 +101,70 @@ model.predict(X = test)
 ```
 
 ### R
+
+First we `require` the `mxnet` package
+
+```r
+require(mxnet)
+```
+
+Then we declare the data iterators to the training and validation datasets
+
+```r
+train <- mx.io.MNISTIter(
+  image       = "train-images-idx3-ubyte",
+  label       = "train-labels-idx1-ubyte",
+  input_shape = c(28, 28, 1),
+  batch_size  = 100,
+  shuffle     = TRUE,
+  flat        = TRUE
+)
+
+val <- mx.io.MNISTIter(
+  image       = "t10k-images-idx3-ubyte",
+  label       = "t10k-labels-idx1-ubyte",
+  input_shape = c(28, 28, 1),
+  batch_size  = 100,
+  flat        = TRUE)
+```
+
+and a two-layer MLP
+
+```r
+data <- mx.symbol.Variable('data')
+fc1  <- mx.symbol.FullyConnected(data = data, name = 'fc1', num_hidden = 128)
+act1 <- mx.symbol.Activation(data = fc1, name = 'relu1', act_type = "relu")
+fc2  <- mx.symbol.FullyConnected(data = act1, name = 'fc2', num_hidden = 64)
+act2 <- mx.symbol.Activation(data = fc2, name = 'relu2', act_type = "relu")
+fc3  <- mx.symbol.FullyConnected(data = act2, name = 'fc3', num_hidden = 10)
+mlp  <- mx.symbol.SoftmaxOutput(data = fc3, name = 'softmax')
+```
+
+Next let's train the model
+
+```r
+model <- mx.model.FeedForward.create(
+  X                  = train,
+  eval.data          = val,
+  ctx                = mx.cpu(),
+  symbol             = mlp,
+  eval.metric        = mx.metric.accuracy,
+  num.round          = 5,
+  learning.rate      = 0.1,
+  momentum           = 0.9,
+  wd                 = 0.0001,
+  array.batch.size   = 100,
+  epoch.end.callback = mx.callback.save.checkpoint("mnist"),
+  batch.end.callback = mx.callback.log.train.metric(50)
+)
+```
+
+Finally we can read a new dataset and predict
+
+```r
+test <- mx.io.MNISTIter(...)
+preds <- predict(model, test)
+```
 
 ### Scala
 
@@ -188,7 +259,7 @@ mlp = @mx.chain mx.Variable(:data)  =>
   mx.FullyConnected(num_hidden=64)  =>
   mx.Activation(act_type=:relu)     =>
   mx.FullyConnected(num_hidden=10)  =>
-  mx.SoftmaxOutput()
+  mx.SoftmaxOutput(name=:softmax)
 ```
 
 The model can be trained by
@@ -226,6 +297,20 @@ The python inferface is similar to `numpy.NDArray`.
 
 ### R
 
+```r
+> require(mxnet)
+Loading required package: mxnet
+> a <- mx.nd.ones(c(2,3))
+> a
+     [,1] [,2] [,3]
+[1,]    1    1    1
+[2,]    1    1    1
+> a + 1
+     [,1] [,2] [,3]
+[1,]    2    2    2
+[2,]    2    2    2
+```
+
 ### Scala
 
 You can do tensor/matrix computation in pure Scala.
@@ -248,9 +333,3 @@ res3: ml.dmlc.mxnet.Shape = (2,3)
 ```
 
 ### Julia
-
-## Recommended Next Steps
-
-- [Build and Install](build.html)
-- [Step by Step Tutorials](../tutorials/index.html)
-- [How-Tos](../tutorials/index.html)

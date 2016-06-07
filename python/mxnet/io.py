@@ -28,6 +28,15 @@ class DataBatch(object):
         self.pad = pad
         self.index = index
 
+class DataBatch(object):
+    """Default object for holding a mini-batch of data and related information."""
+    def __init__(self, data, label, pad=None, index=None,
+                 bucket_key=None, provide_data=None, provide_label=None):
+        self.data = data
+        self.label = label
+        self.pad = pad
+        self.index = index
+
         # the following properties are only used when bucketing is used
         self.bucket_key = bucket_key
         self.provide_data = provide_data
@@ -177,7 +186,6 @@ class ResizeIter(DataIter):
 class PrefetchingIter(DataIter):
     """Base class for prefetching iterators. Takes one or more DataIters (
     or any class with "reset" and "read" methods) and combine them with
-    prefetching.
 
     Parameters
     ----------

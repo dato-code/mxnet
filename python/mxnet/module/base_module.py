@@ -1,11 +1,11 @@
-# pylint: disable=too-many-arguments, too-many-locals
+# pylint: disable=too-many-arguments, too-many-locals, too-many-public-methods
 """`BaseModule` defines an API for modules."""
 
 import logging
 import time
-import numpy as np
 
 from .. import metric
+from .. import ndarray
 
 from ..model import BatchEndParam
 from ..initializer import Uniform
@@ -46,16 +46,21 @@ class BaseModule(object):
       (forward-backward).
 
     In order for a module to interactive with others, a module should be able to report the
-    following information (after binded).
+    following information in its raw stage (before binded)
+
+    - `data_names`: list of string indicating the names of required data.
+    - `output_names`: list of string indicating the names of required outputs.
+
+    And also the following richer information after binded:
 
     - state information
         - `binded`: `bool`, indicating whether the memory buffers needed for computation
-           has been allocated.
+          has been allocated.
         - `for_training`: whether the module is binded for training (if binded).
         - `params_initialized`: `bool`, indicating whether the parameters of this modules
-           has been initialized.
+          has been initialized.
         - `optimizer_initialized`: 'bool`, indicating whether an optimizer is defined
-           and initialized.
+          and initialized.
         - `inputs_need_grad`: `bool`, indicating whether gradients with respect to the
           input data is needed. Might be useful when implementing composition of modules.
 
@@ -166,6 +171,38 @@ class BaseModule(object):
                                                  locals=locals())
                 for callback in _as_list(batch_end_callback):
                     callback(batch_end_params)
+        return eval_metric.get_name_value()
+
+    def iter_predict(self, eval_data, num_batch=None, reset=True):
+        """Iterate over predictions.
+
+            for pred, i_batch, batch in module.iter_predict(eval_data):
+                # pred is a list of outputs from the module
+                # i_batch is a integer
+                # batch is the data batch from the data iterator
+
+        Parameters
+        ----------
+        eval_data : DataIter
+        num_batch : int
+            Default is `None`, indicating running all the batches in the data iterator.
+        reset : bool
+            Default is `True`, indicating whether we should reset the data iter before start
+            doing prediction.
+        """
+        assert self.binded and self.params_initialized
+
+        if reset:
+            eval_data.reset()
+
+        for nbatch, eval_batch in enumerate(eval_data):
+            if num_batch is not None and nbatch == num_batch:
+                break
+            self.forward(eval_batch, is_train=False)
+            pad = eval_batch.pad
+            outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()]
+
+            yield (outputs, nbatch, eval_batch)
 
     def predict(self, eval_data, num_batch=None, merge_batches=True, reset=True,
                 always_output_list=False):
@@ -175,7 +212,7 @@ class BaseModule(object):
         ----------
         eval_data : DataIter
         num_batch : int
-            Default is `None`, indicating run all the batches in the data iterator.
+            Default is `None`, indicating running all the batches in the data iterator.
         merge_batches : bool
             Default is `True`, see the doc for return values.
         reset : bool
@@ -195,6 +232,9 @@ class BaseModule(object):
         `[[out1_batch1, out2_batch1], [out1_batch2], ...]`. This mode is useful because
         in some cases (e.g. bucketing), the module does not necessarily produce the same
         number of outputs.
+
+        The objects in the results are `NDArray`s. If you need to work with numpy array,
+        just call `.asnumpy()` on each of the `NDArray`.
         """
         assert self.binded and self.params_initialized
 
@@ -208,7 +248,8 @@ class BaseModule(object):
                 break
             self.forward(eval_batch, is_train=False)
             pad = eval_batch.pad
-            outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()]
+            outputs = [out[0:out.shape[0]-pad].copy() for out in self.get_outputs()]
+
             output_list.append(outputs)
 
         if len(output_list) == 0:
@@ -220,7 +261,7 @@ class BaseModule(object):
                 assert len(out) == num_outputs, \
                        'Cannot merge batches, as num of outputs is not the same ' + \
                        'in mini-batches. Maybe bucketing is used?'
-            output_list2 = [np.concatenate([out[i] for out in output_list])
+            output_list2 = [ndarray.concatenate([out[i] for out in output_list])
                             for i in range(num_outputs)]
 
             if num_outputs == 1 and not always_output_list:
@@ -234,7 +275,8 @@ class BaseModule(object):
             optimizer='sgd', optimizer_params=(('learning_rate', 0.01),),
             eval_batch_end_callback=None, initializer=Uniform(0.01),
             arg_params=None, aux_params=None, allow_missing=False,
-            force_init=False, begin_epoch=0, num_epoch=None):
+            force_rebind=False, force_init=False, begin_epoch=0, num_epoch=None,
+            validation_metric=None):
         """Train the module parameters.
 
         Parameters
@@ -273,6 +315,8 @@ class BaseModule(object):
             Default `False`. Indicate whether we allow missing parameters when `arg_params`
             and `aux_params` are not `None`. If this is `True`, then the missing parameters
             will be initialized via the `initializer`.
+        force_rebind : bool
+            Default `False`. Whether to force rebinding the executors if already binded.
         force_init : bool
             Default `False`. Indicate whether we should force initialization even if the
             parameters are already initialized.
@@ -287,12 +331,14 @@ class BaseModule(object):
         assert num_epoch is not None, 'please specify number of epochs'
 
         self.bind(data_shapes=train_data.provide_data, label_shapes=train_data.provide_label,
-                  for_training=True, force_rebind=True)
+                  for_training=True, force_rebind=force_rebind)
         self.init_params(initializer=initializer, arg_params=arg_params, aux_params=aux_params,
                          allow_missing=allow_missing, force_init=force_init)
         self.init_optimizer(kvstore=kvstore, optimizer=optimizer,
                             optimizer_params=optimizer_params)
 
+        if validation_metric is None:
+            validation_metric = eval_metric
         if not isinstance(eval_metric, metric.EvalMetric):
             eval_metric = metric.create(eval_metric)
 
@@ -328,13 +374,26 @@ class BaseModule(object):
             #----------------------------------------
             # evaluation on validation set
             if eval_data:
-                self.score(eval_data, eval_metric,
-                           batch_end_callback=eval_batch_end_callback, epoch=epoch)
-                for name, val in eval_metric.get_name_value():
+                res = self.score(eval_data, validation_metric,
+                                 batch_end_callback=eval_batch_end_callback, epoch=epoch)
+                for name, val in res:
                     self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
 
             # end of 1 epoch, reset the data-iter for another epoch
             train_data.reset()
+
+    ################################################################################
+    # Symbol information
+    ################################################################################
+    @property
+    def data_names(self):
+        """A list of names for data required by this module."""
+        raise NotImplementedError()
+
+    @property
+    def output_names(self):
+        """A list of names for the outputs of this module."""
+        raise NotImplementedError()
 
     ################################################################################
     # Input/Output information
@@ -405,6 +464,40 @@ class BaseModule(object):
         """
         self.init_params(initializer=None, arg_params=arg_params, aux_params=aux_params,
                          allow_missing=False, force_init=True)
+
+    def save_params(self, fname):
+        """Save model parameters to file.
+
+        Parameters
+        ----------
+        fname : str
+            Path to output param file.
+        """
+        arg_params, aux_params = self.get_params()
+        save_dict = {('arg:%s' % k) : v for k, v in arg_params.items()}
+        save_dict.update({('aux:%s' % k) : v for k, v in aux_params.items()})
+        ndarray.save(fname, save_dict)
+
+    def load_params(self, fname):
+        """Load model parameters from file.
+
+        Parameters
+        ----------
+        fname : str
+            Path to input param file.
+        """
+        save_dict = ndarray.load(fname)
+        arg_params = {}
+        aux_params = {}
+        for k, value in save_dict.items():
+            arg_type, name = k.split(':', 1)
+            if arg_type == 'arg':
+                arg_params[name] = value
+            elif arg_type == 'aux':
+                aux_params[name] = value
+            else:
+                raise ValueError("Invalid param file " + fname)
+        self.set_params(arg_params, aux_params)
 
     ################################################################################
     # Computations
