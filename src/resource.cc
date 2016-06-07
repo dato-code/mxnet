@@ -254,11 +254,7 @@ void* Resource::get_host_space_internal(size_t size) const {
 static resource::ResourceManagerImpl* instance_ptr = nullptr;
 static bool rm_shutdown = false;
 
-ResourceManager* ResourceManager::Get() {
-  if (instance_ptr == nullptr) {
-  if (rm_shutdown) LOG(FATAL) << "Resource manager already shutdone" << std::endl;
-  static resource::ResourceManagerImpl inst;
-  return &inst;
+
 ResourceManager* ResourceManager::Get() {
   if (instance_ptr == nullptr) {
     if (rm_shutdown) LOG(FATAL) << "Resource manager already shutdone" << std::endl;
