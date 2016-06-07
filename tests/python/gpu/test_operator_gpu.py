@@ -9,7 +9,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import time
 
-def check_type_consistency(sym, ctx_list):
+def check_consistency(sym, ctx_list, scale=1.0):
     tol = {np.dtype(np.float16): 1e-1,
            np.dtype(np.float32): 1e-3,
            np.dtype(np.float64): 1e-5,
@@ -45,7 +45,7 @@ def check_type_consistency(sym, ctx_list):
             try:
                 assert_allclose(arr1, arr2, rtol=tol[dtypes[i]], atol=tol[dtypes[i]])
             except Exception, e:
-                print e
+                print(e)
 
 def check_speed(sym, ctx, scale=1.0, N=100):
     exe = sym.simple_bind(grad_req='write', **ctx)
@@ -64,7 +64,6 @@ def check_speed(sym, ctx, scale=1.0, N=100):
         exe.backward(exe.outputs[0])
         exe.outputs[0].wait_to_read()
     return (time.time() - tic)*1.0/N
-
 
 
 
@@ -90,7 +89,7 @@ def test_activation_with_type():
                 {'ctx': mx.gpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float32}},
                 {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float64}},
                 {'ctx': mx.cpu(0), 'act_data': (2, 2, 10, 10), 'type_dict': {'act_data': np.float32}}]
-    check_type_consistency(sym, ctx_list)
+    check_consistency(sym, ctx_list)
 
 if __name__ == '__main__':
     test_convolution_with_type()
