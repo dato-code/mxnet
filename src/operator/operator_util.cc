@@ -20,8 +20,9 @@ class SimpleBinaryOpProp;
 
 class SimpleOpRegEntryImpl : public SimpleOpRegEntry {
  public:
-  TSelf& set_symbol_op_name(const std::string& symbol_name) override {
+  TSelf& set_symbol_op_name(char const* symbol_name_str) override {
     std::lock_guard<std::mutex> lock(mutex_);
+    std::string symbol_name(symbol_name_str);
     CHECK(op_reg_ == nullptr || symbol_name == symbol_name_)
         << " operator " << this->name
         << " need to call set_symbol_op_name "
@@ -275,7 +276,8 @@ class SimpleOpRegEntryImpl : public SimpleOpRegEntry {
   void RegisterBinarySymbolic();
 };
 
-SimpleOpRegEntry& SimpleOpRegistry::__REGISTER_OR_FIND__(const std::string &name) {
+SimpleOpRegEntry& SimpleOpRegistry::__REGISTER_OR_FIND__(char const* name_str) {
+  std::string name(name_str);
   if (fmap_.count(name) != 0) return *fmap_.at(name);
   SimpleOpRegEntry *e = new SimpleOpRegEntryImpl();
   e->name = name;
@@ -506,6 +508,41 @@ class SimpleOpPropBase : public OperatorProperty {
   std::vector<ResourceRequest> BackwardResource(
       const std::vector<TShape> &in_shape) const override {
     return source->resource_requests_;
+  }
+
+  bool InferType(std::vector<int> *in_type,
+                 std::vector<int> *out_type,
+                 std::vector<int> *aux_type) const override {
+    CHECK_LE(in_type->size(), this->ListArguments().size());
+    int dtype = -1;
+    // reduce dtype to a common one.
+    for (unsigned i = 0; i < in_type->size(); ++i) {
+      if (dtype == -1) {
+        dtype = in_type->at(i);
+      } else {
+        CHECK(in_type->at(i) == -1 ||
+              in_type->at(i) == dtype) <<
+          "Non-uniform input data type. Expected " << dtype << "got " << in_type->at(i);
+      }
+    }
+
+    if (dtype == -1) {
+      LOG(FATAL) << "At least one input type needs to be specified.";
+      return false;
+    }
+
+    int n_in = this->ListArguments().size();
+    in_type->clear();
+    for (int i = 0; i < n_in; ++i) in_type->push_back(dtype);
+
+    int n_out = this->ListOutputs().size();
+    out_type->clear();
+    for (int i = 0; i < n_out; ++i) out_type->push_back(dtype);
+
+    int n_aux = this->ListAuxiliaryStates().size();
+    aux_type->clear();
+    for (int i = 0; i < n_aux; ++i) aux_type->push_back(dtype);
+    return true;
   }
 
   std::string TypeString() const override {
