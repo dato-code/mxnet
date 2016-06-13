@@ -3,7 +3,7 @@ import logging as _logging
 import json as _json
 from collections import namedtuple as _namedtuple
 from .model import FeedForward as _FeedForward
-from .model import extract_feature as _extract_feature 
+from .model import extract_feature as _extract_feature
 from . import ndarray as _ndarray
 from . import io as _io
 import numpy as _np
@@ -203,21 +203,21 @@ def load_path(target_dir, ctx=None):
 class ImageClassifier(object):
     """
     Wrapper of pretrained image classifier model.
-    
+
     Use :py:func:`load_model` or :py:func:`load_path` to load the model. Do not
     construct directly.
 
     Parameters
     ----------
     model :  FeedForward
-        The underlying model 
+        The underlying model
     labels : list
         Map from index to label
     metadata : dict
         Metadata of the model including name, version, input shape, etc.
     """
     def __init__(self, model, labels, metadata):
-        self._model = model 
+        self._model = model
         self._labels = labels
         self._input_shape = metadata['input_shape']
         self.mean_nd = metadata['mean_nd']
@@ -297,14 +297,14 @@ class ImageClassifier(object):
 
 
     def extract_feature(self, data, batch_size=50):
-        # Make DataIter 
+        # Make DataIter
         dataiter = self._make_dataiter(data, batch_size)
         return _extract_feature(self.model, dataiter)
 
 
     def predict_topk(self, data, k=5, batch_size=50):
         """
-        Predict the topk classes for given data 
+        Predict the topk classes for given data
 
         Parameters
         ----------
@@ -320,8 +320,8 @@ class ImageClassifier(object):
         Returns
         -------
         out : SFrame
-            An SFrame of 5 columns: row_id, label_id, label, score, rank 
-        
+            An SFrame of 5 columns: row_id, label_id, label, score, rank
+
         Examples
         --------
         >>> m = mx.pretrained_model.load_model('MNIST_Conv')
@@ -339,12 +339,12 @@ class ImageClassifier(object):
         if k > len(self.labels):
             k = len(self.labels)
 
-        # Make DataIter 
+        # Make DataIter
         dataiter = self._make_dataiter(data, batch_size)
 
         # Make prediction
-        # pred[i][j] is the score of row i belongs to label j 
-        pred = self.model.predict(dataiter) 
+        # pred[i][j] is the score of row i belongs to label j
+        pred = self.model.predict(dataiter)
         # top_idx[i][k] is the label index of kth highest score of row i
         top_idx = pred.argsort()[:,-k:][:,::-1]
         # Take row wise index, to get topk score for each row
@@ -353,7 +353,7 @@ class ImageClassifier(object):
         top_labels = [self.labels[i] for i in top_idx.flatten()]
         row_ids = _np.repeat(_np.arange(len(pred)), k)
         ranks = _np.tile(_np.arange(1, k+1), len(pred))
-        
+
         ret = _gl.SFrame()
         ret['row_id'] = row_ids
         ret['label_id'] = top_idx.flatten()

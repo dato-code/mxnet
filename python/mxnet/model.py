@@ -1018,7 +1018,7 @@ def extract_feature(model, data, top_layer=None, **kwargs):
 
     """
     fea_sym = get_feature_symbol(model, top_layer)
-    mdl = FeedForward(symbol=fea_sym,
+    mdl = FeedForward(symbol=fea_sym, ctx=model.ctx,
                       arg_params=model.arg_params,
                       aux_params=model.aux_params,
                       allow_extra_params=True,
