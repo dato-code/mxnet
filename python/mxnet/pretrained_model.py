@@ -225,6 +225,10 @@ class ImageClassifier(object):
         self.rescale = metadata['scale']
         self._name = metadata['name']
         self._version = metadata['version']
+	if 'label_name' in metadata:
+	    self._label_name = metadata['label_name']
+	else:
+	    self._label_name = 'softmax_label'
 
     @property
     def model(self):
@@ -292,6 +296,8 @@ class ImageClassifier(object):
                                        mean_g=self.mean_rgb[1],
                                        mean_b=self.mean_rgb[2],
                                        mean_nd=self.mean_nd,
+				       data_name='data',
+				       label_name='prob_label',
                                        scale=self.rescale)
         return dataiter
 
