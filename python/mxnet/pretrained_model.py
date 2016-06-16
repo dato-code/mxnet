@@ -6,8 +6,11 @@ from .model import FeedForward as _FeedForward
 from .model import extract_feature as _extract_feature
 from . import ndarray as _ndarray
 from . import io as _io
+from . import symbol as _sym
+from .utils.rcnn_utils import nms, bbox_transform_inv, clip_boxes
 import numpy as _np
 import requests
+import collections
 
 _LOGGER = _logging.getLogger(__name__)
 
@@ -16,6 +19,7 @@ class ModelTypeEnum(object):
     Enumeration of Pretrained Model Type
     """
     IMAGE_CLASSIFIER= 'IMAGE_CLASSIFIER'
+    IMAGE_DETECTOR = 'IMAGE_DETECTOR'
 
 ModelEntry = _namedtuple('ModelEntry', ['name', 'type', 'version'])
 
@@ -361,3 +365,206 @@ class ImageClassifier(object):
         ret['score'] = top_scores.flatten()
         ret['rank'] = ranks
         return ret
+
+class ImageDetector(object):
+    """
+    Wrapeer of pretrained image detect model.
+
+    Use :py:func:`load_model` or :py:func:`load_path` to load the model. Do not
+    construct directly.
+
+    Parameters
+    ----------
+    model: FeedForward
+        The underlying model
+    labels : list
+        Map from index to label
+    metadata: dict
+        Metadata of the model including name, version, input shape, etc
+    """
+    def __init__(self, model, labels, metadata):
+        self._model = model
+        self._labels = labels
+        self._metadata = metadata
+        self._num_classes = len(labels)
+        # rcnn params
+        for k, v in metadata.items():
+            self.__setattr__("_" + k, v)
+
+        # new executor
+        self._ctx = model.ctx[0] # only support single device for now
+        self._sym = model.symbol
+        self._arg_params = {k : v.as_in_context(self._ctx) for k, v in model.arg_params.items()}
+        self._aux_params = {k : v.as_in_context(self._ctx) for k, v in model.aux_params.items()}
+        self._executor_with_feature = False
+
+    def _init_executor(self, sym):
+        #self._arg_params["data"] = _ndarray.zeros(self._input_shape, self._ctx)
+        self._executor = sym.bind(self._ctx, self._arg_params, args_grad=None,
+                                  grad_req="null", aux_states=self._aux_params)
+
+    @property
+    def model(self):
+        return self._model
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def version(self):
+        return self._version
+
+    def _detect(self, im):
+        im_tensor, im_info = self._preprocess(im)
+        self._arg_params["im_info"][:] = im_info
+        self._arg_params["data"] = _ndarray.array(im_tensor, ctx=self._ctx)
+        #self._executor = self._executor.reshape(data=im_tensor.shape, im_info=(1, 3))
+        self._init_executor(self._sym)
+        self._executor.forward()
+        blobs = dict(zip(self._sym.list_outputs(), [x.asnumpy() for x in self._executor.outputs]))
+        scores = blobs["cls_prob_output"]
+        bbox_deltas = blobs["bbox_pred_output"]
+        rois = blobs["rois_output"]
+        boxes = rois[:, 1:5] / im_info[0][2]
+        boxes = bbox_transform_inv(boxes, bbox_deltas)
+        boxes = clip_boxes(boxes, (im_info[0][0] / im_info[0][2],
+                                   im_info[0][1] / im_info[0][2],
+                                   3))
+        blobs["bbox_pred"] = boxes
+        del blobs["rois_output"]
+        del blobs["bbox_pred_output"]
+        return blobs
+
+
+    def _preprocess(self, im, target_size=600, max_size=1000):
+        import PIL
+        import numpy as np
+        import StringIO as _StringIO
+        # build PIL image from sframe
+        im = PIL.Image.open(_StringIO.StringIO(im._image_data))
+        im_shape = im.size
+        im_size_min = np.min(im_shape[0:2])
+        im_size_max = np.max(im_shape[0:2])
+        im_scale = float(target_size) / float(im_size_min)
+        # prevent bigger axis from being more than max_size:
+        if np.round(im_scale * im_size_max) > max_size:
+            im_scale = float(max_size) / float(im_size_max)
+        im_hw = (int(im_shape[0] * im_scale), int(im_shape[1] * im_scale))
+        im = im.resize(im_hw, PIL.Image.ANTIALIAS)
+        # normalize
+        im = np.asarray(im).astype("float32").copy()
+        im -= self._mean_rgb
+        if "scale" in self._metadata:
+            im *= self._scale
+        im_tensor = im[np.newaxis, :]
+        im_tensor = im_tensor.transpose((0, 3, 1, 2))
+        im_info = np.array([[im_tensor.shape[2], im_tensor.shape[3], im_scale]], dtype=np.float32)
+        return im_tensor, im_info
+
+
+    def _postprocess(self, blobs, thresh=0.3):
+        out_blob = {}
+        dets = []
+        feature = []
+        scores = blobs["cls_prob_output"]
+        boxes = blobs["bbox_pred"]
+        for j in range(1, self._num_classes):
+            inds = _np.where(scores[:, j] > thresh)[0]
+            cls_scores = scores[inds, j]
+            cls_boxes = boxes[inds, j * 4 : (j + 1) * 4]
+            cls_dets = _np.hstack((cls_boxes, cls_scores[:, _np.newaxis]))\
+                    .astype(_np.float32, copy=False)
+            keep = nms(cls_dets, 0.3)
+            cls_dets = cls_dets[keep, :]
+            dets.append(list(cls_dets))
+            if self._executor_with_feature:
+                fea =  blobs["feature_output"][keep, :]
+                feature.append(list(fea))
+        out_blob["dets"] = dets
+        if self._executor_with_feature:
+            out_blob["feature"] = feature
+        return out_blob
+
+    def detect(self, data, filter_result=False, thresh=0.3):
+        try:
+            import graphlab as _gl
+        except ImportError:
+            import sframe as _gl
+        except ImportError:
+            raise ImportError('Require GraphLab Create or SFrame')
+        if type(data) == _gl.Image:
+            blobs = self._detect(data)
+            if filter_result:
+                return self._postprocess(blobs, thresh)
+            else:
+                return blobs
+        elif type(data) == _gl.SArray:
+            if filter_result:
+                tmp = collections.defaultdict(list)
+                for x in data:
+                    ret = self._postprocess(self._detect(x))
+                    for key in ret.keys():
+                        tmp[key].append(ret[key])
+                return _gl.SFrame(tmp)
+            else:
+                tmp = collections.defaultdict(list)
+                for x in data:
+                    ret = self._detect(x)
+                    for key in ret.keys():
+                        tmp[key].append(ret[key])
+                return _gl.SFrame(tmp)
+        else:
+            raise Exception("Unsupport input data type.")
+
+    def extract_feature(self, data, filter_result=False, thresh=0.3, feature_op="roi_pool5"):
+        if not self._executor_with_feature:
+            outputs = self._sym.list_outputs()
+            internals = self._sym.get_internals()
+            roi_pool = internals["%s_output" % feature_op]
+            fea_pool = _sym.Pooling(name="roi_avg_pool", data=roi_pool,
+                                      kernel=(7,7), stride=(1,1), pool_type="avg")
+            fea_flatten = _sym.Flatten(name="feature", data=fea_pool)
+            tmp = [internals[x] for x in outputs]
+            tmp.append(fea_flatten)
+            self._sym = _sym.Group(tmp)
+            self._executor_with_feature = True
+        return self.detect(data, filter_result)
+
+    def visualize_detection(self, im, dets):
+        import matplotlib.pyplot as plt
+        import StringIO as _StringIO
+        import PIL
+        try:
+            import graphlab as _gl
+        except ImportError:
+            import sframe as _gl
+        except ImportError:
+            raise ImportError('Require GraphLab Create or SFrame')
+
+        assert(type(im) == _gl.Image)
+        im = PIL.Image.open(_StringIO.StringIO(im._image_data))
+        for j in range(1, self._num_classes):
+            class_name = self.labels[j]
+            if len(dets[j - 1]) == 0:
+                continue
+            det = _np.vstack(dets[j - 1])
+            for i in range(_np.minimum(10, det.shape[0])):
+                bbox = det[i, :4]
+                score = det[i, -1]
+                plt.cla()
+                plt.imshow(im)
+                plt.gca().add_patch(
+                plt.Rectangle((bbox[0], bbox[1]),
+                            bbox[2] - bbox[0],
+                            bbox[3] - bbox[1], fill=False,
+                            edgecolor='r', linewidth=3)
+                )
+                plt.title('{}  {:.3f}'.format(class_name, score))
+                plt.show()
+
+

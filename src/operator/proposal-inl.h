@@ -283,7 +283,7 @@ class ProposalProp : public OperatorProperty {
   }
 
   std::vector<std::string> ListOutputs() const override {
-    return {"rois", "rois_pad", "temp_proposal", "temp_nms"};
+    return {"output", "output_pad", "temp_proposal", "temp_nms"};
   }
 
   Operator* CreateOperator(Context ctx) const override;

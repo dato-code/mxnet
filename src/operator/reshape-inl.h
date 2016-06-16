@@ -27,18 +27,6 @@ enum ReshapeOpOutputs {kOut};
 
 
 struct ShapeInfo {
-  inline size_t ndim() const {
-    return info.size();
-  }
-
-  inline size_t Size() const {
-    size_t sz = 1;
-    for (size_t i = 0; i < info.size(); ++i) {
-      sz *= info[i];
-    }
-    return sz;
-  }
-
   std::vector<int> info;
 };
 
@@ -52,18 +40,9 @@ inline std::istream &operator>>(std::istream &is, ShapeInfo &shape) {
       return is;
     }
   }
+
   int idx;
   std::vector<int> tmp;
-  // deal with empty case
-  // safe to remove after stop using target_shape
-  size_t pos = is.tellg();
-  char ch = is.get();
-  if (ch == ')') {
-    shape.info = tmp;
-    return is;
-  }
-  is.seekg(pos);
-  // finish deal
   while (is >> idx) {
     tmp.push_back(idx);
     char ch;
@@ -202,7 +181,7 @@ class ReshapeProp : public OperatorProperty {
              param_.shape.info.size() > 0, true) << "targe_shape or shape must be present.";
     const TShape &dshape = in_shape->at(reshape_enum::kData);
     if (dshape.ndim() == 0) return false;
-    if (param_.shape.ndim() != 0) {
+    if (param_.shape.info.size() != 0) {
       std::vector<int> tmp;
       int src_idx = 0;
       int neg_idx = -1;
