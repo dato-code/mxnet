@@ -200,6 +200,22 @@ def load_path(target_dir, ctx=None):
         _LOGGER.debug('label_file: %s' % label_file)
         labels = _json.load(open(label_file))
         return ImageClassifier(model, labels, metadata)
+    elif metadata['model_type'] == ModelTypeEnum.IMAGE_DETECTOR:
+        param_file = [f for f in _os.listdir(target_dir) if f.endswith('.params')]
+        if len(param_file) != 1:
+            raise ValueError('Invalid model directory %s. Please remove the directory and redownload the model' % target_dir)
+        _LOGGER.debug('param_file: %s' % param_file[0])
+        prefix = _os.path.splitext(param_file[0])[0]
+        epoch = prefix.split('-')[-1]
+        prefix = prefix[:-(len(epoch) + 1)]
+        prefix = _os.path.join(target_dir, prefix)
+        epoch = int(epoch)
+        _LOGGER.debug('prefix: %s, epoch: %s' % (prefix, epoch))
+
+        # Load the feedforward model
+        model = _FeedForward.load(prefix, epoch, ctx)
+        label_file = _os.path.join(target_dir, 'labels.json')
+        return ImageDetector(model, label_file, metadata)
     else:
         raise TypeError('Unexpected model type: %s', metadata['model_type'])
 
@@ -229,10 +245,10 @@ class ImageClassifier(object):
         self.rescale = metadata['scale']
         self._name = metadata['name']
         self._version = metadata['version']
-	if 'label_name' in metadata:
-	    self._label_name = metadata['label_name']
-	else:
-	    self._label_name = 'softmax_label'
+        if 'label_name' in metadata:
+            self._label_name = metadata['label_name']
+        else:
+            self._label_name = 'softmax_label'
 
     @property
     def model(self):
@@ -300,8 +316,8 @@ class ImageClassifier(object):
                                        mean_g=self.mean_rgb[1],
                                        mean_b=self.mean_rgb[2],
                                        mean_nd=self.mean_nd,
-				       data_name='data',
-				       label_name='prob_label',
+                                       data_name='data',
+                                       label_name='prob_label',
                                        scale=self.rescale)
         return dataiter
 
@@ -425,8 +441,11 @@ class ImageDetector(object):
     def version(self):
         return self._version
 
-    def _detect(self, im):
-        im_tensor, im_info = self._preprocess(im)
+    def __str__(self):
+        return "ImageDetector: " + self._name + "(version %s)" % self._version
+
+    def _detect(self, gl_im):
+        im_tensor, im_info = self._preprocess(gl_im)
         self._arg_params["im_info"][:] = im_info
         self._arg_params["data"] = _ndarray.array(im_tensor, ctx=self._ctx)
         #self._executor = self._executor.reshape(data=im_tensor.shape, im_info=(1, 3))
@@ -447,12 +466,12 @@ class ImageDetector(object):
         return blobs
 
 
-    def _preprocess(self, im, target_size=600, max_size=1000):
+    def _preprocess(self, gl_im, target_size=600, max_size=1000):
         import PIL
         import numpy as np
         import StringIO as _StringIO
         # build PIL image from sframe
-        im = PIL.Image.open(_StringIO.StringIO(im._image_data))
+        im = gl_im._to_pil_image()
         im_shape = im.size
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
@@ -473,19 +492,19 @@ class ImageDetector(object):
         return im_tensor, im_info
 
 
-    def _postprocess(self, blobs, thresh=0.3):
+    def _postprocess(self, blobs, class_score_threshold=0.3, nms_threshold=0.3):
         out_blob = {}
         dets = []
         feature = []
         scores = blobs["cls_prob_output"]
         boxes = blobs["bbox_pred"]
         for j in range(1, self._num_classes):
-            inds = _np.where(scores[:, j] > thresh)[0]
+            inds = _np.where(scores[:, j] > class_score_threshold)[0]
             cls_scores = scores[inds, j]
             cls_boxes = boxes[inds, j * 4 : (j + 1) * 4]
             cls_dets = _np.hstack((cls_boxes, cls_scores[:, _np.newaxis]))\
                     .astype(_np.float32, copy=False)
-            keep = nms(cls_dets, 0.3)
+            keep = nms(cls_dets, nms_threshold)
             cls_dets = cls_dets[keep, :]
             dets.append(list(cls_dets))
             if self._executor_with_feature:
@@ -496,7 +515,37 @@ class ImageDetector(object):
             out_blob["feature"] = feature
         return out_blob
 
-    def detect(self, data, filter_result=False, thresh=0.3):
+    def detect(self, data, filter_result=False, class_score_threshold=0.3, nms_threshold=0.3):
+        """
+        Detect objects for the given data
+
+        Parameters
+        ----------
+        data : SArray[Image] or gl.Image
+            SArray of images type of a single gl.Imgae
+            Image can be in various of size
+        filter_result: bool, optional
+            Filter raw detection result
+            If set to false, the returned result will box and score of 300 proposal for all objects
+            If set to true, the returned result will be filtered by nms and classification scroe
+        class_score_threshold: float, optional
+            Threshold for filtering.
+            If the classification score is below threshold, the result will be filtered out
+        nms_threshold: float, optional
+            Threshold for filtering by nms(non-maximum surprised)
+            If the nms score is below threshold, the result will be filtered out
+
+        Returns
+        -------
+        out: dict or SFrame
+            If input is gl.Image, out will be dict
+            If input is SArray[Image], out will be SFrame
+            If filter_result is False, keys will be [cls_prob_output, bbox_pred]
+            If filter_result is True, keys will be [dets]
+            dets format is detection result for each class.
+            The dection result is in 5 columns: 4 for box and last column is classification score
+        """
+
         try:
             import graphlab as _gl
         except ImportError:
@@ -506,14 +555,14 @@ class ImageDetector(object):
         if type(data) == _gl.Image:
             blobs = self._detect(data)
             if filter_result:
-                return self._postprocess(blobs, thresh)
+                return self._postprocess(blobs, class_score_threshold, nms_threshold)
             else:
                 return blobs
         elif type(data) == _gl.SArray:
             if filter_result:
                 tmp = collections.defaultdict(list)
                 for x in data:
-                    ret = self._postprocess(self._detect(x))
+                    ret = self._postprocess(self._detect(x), class_score_threshold, nms_threshold)
                     for key in ret.keys():
                         tmp[key].append(ret[key])
                 return _gl.SFrame(tmp)
@@ -527,7 +576,45 @@ class ImageDetector(object):
         else:
             raise Exception("Unsupport input data type.")
 
-    def extract_feature(self, data, filter_result=False, thresh=0.3, feature_op="roi_pool5"):
+    def extract_feature(self, data,
+                        filter_result=False,
+                        class_score_threshold=0.3,
+                        nms_threshold=0.3,
+                        feature_op="roi_pool5"):
+        """
+        Detect objects and extract feature of objects for the given data
+
+        Parameters
+        ----------
+        data : SArray[Image] or gl.Image
+            SArray of images type of a single gl.Imgae
+            Image can be in various of size
+        filter_result: bool, optional
+            Filter raw detection result
+            If set to false, the returned result will box and score of 300 proposal for all objects
+            If set to true, the returned result will be filtered by nms and classification scroe
+        class_score_threshold: float, optional
+            Threshold for filtering.
+            If the classification score is below threshold, the result will be filtered out
+        nms_threshold: float, optional
+            Threshold for filtering by nms(non-maximum surprised)
+            If the nms score is below threshold, the result will be filtered out
+        feature_op: str, optional
+            Name of operator which generates object feature
+
+
+        Returns
+        -------
+        out: dict or SFrame
+            If input is gl.Image, out will be dict
+            If input is SArray[Image], out will be SFrame
+            If filter_result is False, keys will be [cls_prob_output, bbox_pred, feature]
+            If filter_result is True, keys will be [dets, feature]
+            dets format is detection result for each class. feature is in same format of dets
+            The dection result is in 5 columns: 4 for box and last column is classification score
+            The feature is a vector
+        """
+
         if not self._executor_with_feature:
             outputs = self._sym.list_outputs()
             internals = self._sym.get_internals()
@@ -539,9 +626,20 @@ class ImageDetector(object):
             tmp.append(fea_flatten)
             self._sym = _sym.Group(tmp)
             self._executor_with_feature = True
-        return self.detect(data, filter_result)
+        return self.detect(data, filter_result, class_score_threshold, nms_threshold)
 
-    def visualize_detection(self, im, dets):
+    def visualize_detection(self, gl_im, dets):
+        """
+        Visualize detection result
+
+        Parameters
+        ----------
+        gl_im: gl.Image
+            The image will be visalized
+        dets: list
+            Filted detection result
+
+        """
         import matplotlib.pyplot as plt
         import StringIO as _StringIO
         import PIL
@@ -552,8 +650,8 @@ class ImageDetector(object):
         except ImportError:
             raise ImportError('Require GraphLab Create or SFrame')
 
-        assert(type(im) == _gl.Image)
-        im = PIL.Image.open(_StringIO.StringIO(im._image_data))
+        assert(type(gl_im) == _gl.Image)
+        im = gl_im._to_pil_image()
         for j in range(1, self._num_classes):
             class_name = self.labels[j]
             if len(dets[j - 1]) == 0:
