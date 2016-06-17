@@ -21,7 +21,7 @@ except:
 @unittest.skipIf(__has_sframe__ is False and __has_graphlab__ is False, 'graphlab or sframe not found')
 class SFrameImageIteratorBaseTest(unittest.TestCase):
     def setUp(self):
-        (w, h, c, n) = (2, 4, 3, 10)
+        (w, h, c, n) = (2, 4, 3, 100)
         self.images = [np.random.randint(256, size=(h,w,c)) for i in range(n)]
         self.data = gl.SFrame({'arr': [array.array('d', x.flatten()) for x in self.images],
                               'y': np.random.randint(2, size=n)})
@@ -97,3 +97,36 @@ class SFrameImageIteratorBaseTest(unittest.TestCase):
             x[:,:,:,2] += mean_b
             data_actual.extend(x.flatten())
         np.testing.assert_almost_equal(data_actual, self.data_expected)
+
+    def test_random_flip(self): 
+        it = mxnet.io.SFrameImageIter(self.data, data_field=self.data_field,
+                                 label_field=self.label_field,
+                                 batch_size=1,
+                                 random_flip=True)
+        data_actual = []
+        data_actual_flipped = []
+        for d in it:
+            # reorder from (batch, channel, height, width) to (batch, height, width, channel)
+            x = d.data[0].asnumpy()
+            x = np.swapaxes(x, 1, 3)
+            x = np.swapaxes(x, 1, 2)
+            data_actual.append(x.flatten())
+
+            x_flipped = d.data[0].asnumpy()[:,:,:,::-1]
+            x_flipped = np.swapaxes(x_flipped, 1, 3)
+            x_flipped = np.swapaxes(x_flipped, 1, 2)
+            data_actual_flipped.append(x_flipped.flatten())
+        
+        num_flipped = 0
+        for expected, actual, flipped in zip(list(self.data['arr']), data_actual, data_actual_flipped):
+            if np.allclose(expected,actual):
+                pass
+            elif np.allclose(expected, flipped):
+                num_flipped = num_flipped + 1
+            else:
+                assert self.assertTrue(False)
+
+        flipped_ratio = float(num_flipped)/self.data_size
+
+        #Check that roughly half images are flipped
+        self.assertAlmostEqual(flipped_ratio, 0.5, delta=0.2)
