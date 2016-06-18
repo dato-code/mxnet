@@ -654,6 +654,8 @@ class SFrameImageIter(SFrameIter):
         This option will surpress mean_r, mean_g, and mean_b.
     scale : float, optional
         multiply each pixel value by the scale (this operation is performed after mean subtraction)
+    random_flip : bool, optional 
+        Randomly flip horizontally on the fly, useful to augment data for training neural network. 
     **kwargs :
         placeholder for new parameters
 
@@ -678,6 +680,7 @@ class SFrameImageIter(SFrameIter):
                  mean_b=0.0,
                  mean_nd=None,
                  scale=1.0,
+                 random_flip=False,
                  **kwargs):
         super(SFrameImageIter, self).__init__(sframe, data_field, label_field, batch_size,
                                               data_name, label_name)
@@ -704,6 +707,8 @@ class SFrameImageIter(SFrameIter):
         # Rescale parameters
         self._scale = scale
 
+        #Augmentation parameters
+        self._random_flip = random_flip
     def _type_check(self, sframe, data_field, label_field):
         if label_field is not None:
             label_column_type = sframe[label_field].dtype()
@@ -730,6 +735,9 @@ class SFrameImageIter(SFrameIter):
         ret = super(self.__class__, self).iter_next()
         # Postprocess: normalize by mean, scale, ...
         self.data_ndarray = (self.data_ndarray - self._rgb_mask) * self._scale
+        # random flip
+        if self._random_flip:
+            self.data_ndarray = array(self.data_ndarray.asnumpy()[:,:,:,::(np.random.randint(2)- 0.5) * 2])
         return ret
 
 
