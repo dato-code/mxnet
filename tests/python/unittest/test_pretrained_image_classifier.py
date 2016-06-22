@@ -34,9 +34,17 @@ class PretrainedImageClassifierTest(unittest.TestCase):
 	accuracy = graphlab.evaluation.accuracy(test['label'], test['preds'])
 	self.assertGreater(accuracy, 0.95)
 
+        # Test SArray
+	preds2 = self.model.predict_topk(self.test['image'], k=1)
+        self.assertListEqual(list(preds['label']), list(preds2['label']))
+
+        # Test Image
+	preds3 = self.model.predict_topk(self.test['image'][0], k=1)
+        self.assertEqual(preds['label'][0], preds3['label'][0])
+
 	# Test k > 1		
-	preds2 = self.model.predict_topk(self.test, k=5)
-	self.assertEqual(len(preds) * 5, len(preds2))	
+	preds4 = self.model.predict_topk(self.test, k=5)
+	self.assertEqual(len(preds) * 5, len(preds4))	
 
 	# Test bad input
 	duplicate_image = self.test.copy()
@@ -66,6 +74,15 @@ class PretrainedImageClassifierTest(unittest.TestCase):
 
 	self.assertGreater(accuracy, 0.95)
 	
+        # Test SArray
+	test_features2 = self.model.extract_feature(self.test['image'])
+	np.testing.assert_array_almost_equal(np.concatenate(list(test_features2['feature'])), np.concatenate(list(test_features['feature'])))
+	
+        # Test Image
+	test_features3 = self.model.extract_feature(self.test['image'][0])
+	np.testing.assert_array_almost_equal(np.concatenate(list(test_features3['feature'])), np.concatenate(list(test_features['feature'][0:1])))
+	
+
 	# Test bad input
 	duplicate_image = self.test.copy()
 	duplicate_image['dup'] = duplicate_image['image']

@@ -284,19 +284,20 @@ class ImageClassifier(object):
         except ImportError:
             raise ImportError('Require GraphLab Create or SFrame')
 
-        if type(data) is not _gl.SFrame and type(data) is not _gl.SArray:
-            raise TypeError('Input data must be SFrame or SArray')
+        if type(data) is not _gl.SFrame and type(data) is not _gl.SArray and type(data) is not _gl.Image:
+            raise TypeError('Input data must be SFrame, SArray or Image')
         if type(data) is _gl.SArray and data.dtype() != _gl.Image:
             raise TypeError('Expect image typed SArray, actual type is %s' % str(data.dtype()))
         elif type(data) is _gl.SFrame:
             if data.column_types().count(_gl.Image) != 1:
-#            if len(data.column_names()) != 1 or data.column_types()[0] != _gl.Image:
                 raise TypeError('Input SFrame must contain a single Image typed column')
-        if batch_size < len(data):
-            batch_size = len(data)
-
         if type(data) is _gl.SArray:
             data = _gl.SFrame({'image': data})
+        if type(data) is _gl.Image:
+            data = _gl.SFrame({'image': [data]})
+        if batch_size > len(data):
+            batch_size = len(data)
+
         image_col = data.column_names()[data.column_types().index(_gl.Image)]
         first_image = data[image_col][0]
         input_shape = (first_image.height, first_image.width, first_image.channels)
@@ -334,8 +335,9 @@ class ImageClassifier(object):
 
         Parameters
         ----------
-        data : SFrame or SArray[Image]
-            SFrame with a single image typed column.
+        data : SFrame, SArray[Image] or Image
+            SFrame with a single image typed column, an SArray of Images, or
+            a single Image
             Images must have the same size as the model's input shape.
        batch_size : int, optional
             batch size of the input to the internal model. Larger
@@ -375,7 +377,8 @@ class ImageClassifier(object):
         Parameters
         ----------
         data : SFrame or SArray[Image]
-            SFrame with a single image typed column.
+            SFrame with a single image typed column, an SArray of Images.
+            or a single Image. 
             Images must have the same size as the model's input shape.
         k : int, optional
             Number of classes returned for each input
@@ -613,8 +616,26 @@ class ImageDetector(object):
                     for key in ret.keys():
                         tmp[key].append(ret[key])
                 return _gl.SFrame(tmp)
+        elif type(data) == _gl.SFrame:
+            if data.column_types().count(_gl.Image) != 1:
+                raise TypeError('Input SFrame must contain a single Image typed column')
+            sa_data = data[data.column_names()[data.column_types().index(_gl.Image)]]
+            if filter_result:
+                tmp = collections.defaultdict(list)
+                for x in sa_data:
+                    ret = self._postprocess(self._detect(x), class_score_threshold, nms_threshold)
+                    for key in ret.keys():
+                        tmp[key].append(ret[key])
+                return _gl.SFrame(tmp)
+            else:
+                tmp = collections.defaultdict(list)
+                for x in sa_data:
+                    ret = self._detect(x)
+                    for key in ret.keys():
+                        tmp[key].append(ret[key])
+                return _gl.SFrame(tmp)
         else:
-            raise Exception("Unsupport input data type.")
+            raise Exception("Unsupported input data type.")
 
     def extract_feature(self, data,
                         filter_result=False,
@@ -677,7 +698,7 @@ class ImageDetector(object):
         gl_im: gl.Image
             The image will be visalized
         dets: list
-            Filted detection result
+            Filtered detection result
 
         """
         import matplotlib.pyplot as plt
