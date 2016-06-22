@@ -158,7 +158,7 @@ def load_path(target_dir, ctx=None):
 
     Examples
     --------
-    >>> model = mx.pretrained_model.load_model('~/.graphlab/mxnet_models/InceptionV3')
+    >>> model = mx.pretrained_model.load_path('~/.graphlab/mxnet_models/InceptionV3')
     """
 
     _LOGGER.debug('load from: %s' % (target_dir))
@@ -289,14 +289,15 @@ class ImageClassifier(object):
         if type(data) is _gl.SArray and data.dtype() != _gl.Image:
             raise TypeError('Expect image typed SArray, actual type is %s' % str(data.dtype()))
         elif type(data) is _gl.SFrame:
-            if len(data.column_names()) != 1 or data.column_types()[0] != _gl.Image:
-                raise TypeError('Input SFrame must contain only a single image typed column')
+            if data.column_types().count(_gl.Image) != 1:
+#            if len(data.column_names()) != 1 or data.column_types()[0] != _gl.Image:
+                raise TypeError('Input SFrame must contain a single Image typed column')
         if batch_size < len(data):
             batch_size = len(data)
 
         if type(data) is _gl.SArray:
             data = _gl.SFrame({'image': data})
-        image_col = data.column_names()[0]
+        image_col = data.column_names()[data.column_types().index(_gl.Image)]
         first_image = data[image_col][0]
         input_shape = (first_image.height, first_image.width, first_image.channels)
 
@@ -317,16 +318,55 @@ class ImageClassifier(object):
                                        mean_b=self.mean_rgb[2],
                                        mean_nd=self.mean_nd,
                                        data_name='data',
-                                       label_name='prob_label',
+                                       label_name=self._label_name,
                                        scale=self.rescale)
         return dataiter
 
+    def extract_features(self, *args, **kwargs):
+        """
+        Alias for :py:func:`~mxnet.pretrained_model.ImageClassifier.extract_feature` 
+        """
+        return self.extract_feature(*args, **kwargs)
 
     def extract_feature(self, data, batch_size=50):
-        # Make DataIter
-        dataiter = self._make_dataiter(data, batch_size)
-        return _extract_feature(self.model, dataiter)
+        """
+        Extracts features from the second to last layer in the network.
 
+        Parameters
+        ----------
+        data : SFrame or SArray[Image]
+            SFrame with a single image typed column.
+            Images must have the same size as the model's input shape.
+       batch_size : int, optional
+            batch size of the input to the internal model. Larger
+            batch size makes the prediction faster but requires more memory.
+
+        Returns
+        -------
+        out : SFrame
+            An SFrame of 2 columns: row_id, feature
+
+        Examples
+        --------
+        >>> m = mx.pretrained_model.load_model('mnist_lenet')
+        >>> sf = SFrame('http://s3.amazonaws.com/dato-datasets/mnist/sframe/train')
+        >>> m.extract_feature(sf['image'])
+        """
+        try:
+            import graphlab as _gl
+        except ImportError:
+            import sframe as _gl
+        except ImportError:
+            raise ImportError('Require GraphLab Create or SFrame')
+
+       # Make DataIter
+        dataiter = self._make_dataiter(data, batch_size)
+        features =  _extract_feature(self.model, dataiter)
+
+        ret = _gl.SFrame()
+        ret['feature'] = features
+        ret = ret.add_row_number(column_name='row_id')
+        return ret
 
     def predict_topk(self, data, k=5, batch_size=50):
         """
@@ -335,7 +375,7 @@ class ImageClassifier(object):
         Parameters
         ----------
         data : SFrame or SArray[Image]
-            SFrame of a single image typed column.
+            SFrame with a single image typed column.
             Images must have the same size as the model's input shape.
         k : int, optional
             Number of classes returned for each input
@@ -350,7 +390,7 @@ class ImageClassifier(object):
 
         Examples
         --------
-        >>> m = mx.pretrained_model.load_model('MNIST_Conv')
+        >>> m = mx.pretrained_model.load_model('mnist_lenet')
         >>> sf = SFrame('http://s3.amazonaws.com/dato-datasets/mnist/sframe/train')
         >>> m.predict_topk(sf['image'])
         """
@@ -390,7 +430,7 @@ class ImageClassifier(object):
 
 class ImageDetector(object):
     """
-    Wrapeer of pretrained image detect model.
+    Wrapper of pretrained image detect model.
 
     Use :py:func:`load_model` or :py:func:`load_path` to load the model. Do not
     construct directly.
@@ -522,7 +562,7 @@ class ImageDetector(object):
         Parameters
         ----------
         data : SArray[Image] or gl.Image
-            SArray of images type of a single gl.Imgae
+            SArray of images type or a single gl.Imgae
             Image can be in various of size
         filter_result: bool, optional
             Filter raw detection result
