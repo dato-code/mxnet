@@ -701,7 +701,7 @@ class SFrameImageIter(SFrameIter):
             else:
                 raise ValueError('Shape mismatch. mean_nd has different shape from input image')
         else:
-            raise TypeError('mean_nd must be type np.ndarray or mxnet.ndarray.array')
+            raise TypeError('mean_nd must be type np.ndarray')
         self._rgb_mask = array(self._rgb_mask)
 
         # Rescale parameters
