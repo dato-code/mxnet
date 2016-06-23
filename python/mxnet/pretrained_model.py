@@ -79,7 +79,8 @@ def download_model(url, location=DEFAULT_MODEL_LOCATION, overwrite=False):
     Parameters
     ----------
     url : str,
-      URL of the model. Get the list of available models from https://s3.amazonaws.com/dato-models/mxnet_models/release/
+      URL of the model. Get the list of available models from
+      https://dato.com/products/create/docs/graphlab.mxnet.pretrained_image_model.html
     location : str, optional
       The local directory where the model is saved to.
     overwrite : bool, optional
@@ -636,7 +637,14 @@ class ImageDetector(object):
         else:
             raise Exception("Unsupported input data type.")
 
-    def extract_feature(self, data,
+    def extract_feature(self, *args, **kwargs):
+        """
+        Alias for :py:func:`~mxnet.pretrained_model.ImageDetector.extract_features`
+        """
+        return self.extract_features(*args, **kwargs)
+
+
+    def extract_features(self, data,
                         class_score_threshold=0.5,
                         nms_threshold=0.3,
                         feature_op="roi_pool5"):
