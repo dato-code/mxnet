@@ -34,7 +34,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
   ThreadedEnginePerDevice() noexcept(false) {
     gpu_worker_nthreads_ = common::GetNumThreadPerGPU();
     gpu_copy_nthreads_ = dmlc::GetEnv("MXNET_GPU_COPY_NTHREADS", 1);
-    cpu_worker_nthreads_ = dmlc::GetEnv("MXNET_CPU_WORKER_NTHREADS", 1);
+    cpu_worker_nthreads_ = dmlc::GetEnv("MXNET_CPU_WORKER_NTHREADS", 2);
     // create CPU task
     int cpu_priority_nthreads = dmlc::GetEnv("MXNET_CPU_PRIORITY_NTHREADS", 4);
     cpu_priority_worker_.reset(new ThreadWorkerBlock<kPriorityQueue>());
