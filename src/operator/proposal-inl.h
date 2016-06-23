@@ -202,7 +202,6 @@ class ProposalOp : public NativeOpBase<xpu> {
     }
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
     if (s != NULL) s->Wait();
-    ctx.async_on_complete();
   }
 
  private:

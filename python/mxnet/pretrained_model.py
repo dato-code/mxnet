@@ -79,7 +79,7 @@ def download_model(url, location=DEFAULT_MODEL_LOCATION, overwrite=False):
     Parameters
     ----------
     url : str,
-      URL of the model. Get the list of available models from https://github.com/dato-code/mxnet.
+      URL of the model. Get the list of available models from https://s3.amazonaws.com/dato-models/mxnet_models/release/
     location : str, optional
       The local directory where the model is saved to.
     overwrite : bool, optional
@@ -87,8 +87,8 @@ def download_model(url, location=DEFAULT_MODEL_LOCATION, overwrite=False):
 
     Examples
     --------
-    >>> mx.pretrained_model.download_model('https://.../InceptionV3.tar.gz')
-    >>> model = mx.pretrained_model.load_model('InceptionV3')
+    >>> mx.pretrained_model.download_model('https://.../image_classifier/imagenet1k_inception_v3-1.0.tar.gz')
+    >>> model = mx.pretrained_model.load_model('imagenet1k_inception_v3')
     """
     name = url.split('/')[-1]
     name = name.split('-')[0]
@@ -135,7 +135,7 @@ def load_model(name, ctx=None, location=DEFAULT_MODEL_LOCATION):
 
     Examples
     --------
-    >>> model = mx.pretrained_model.load_model('InceptionV3', ctx=mx.gpu(0))
+    >>> model = mx.pretrained_model.load_model('imagenet1k_inception_v3', ctx=mx.gpu(0))
     """
     if not any(name == m.name for m in list_models(location)):
         raise KeyError('Model %s does not exist. Models can be listed using list_models()' % name)
@@ -153,12 +153,10 @@ def load_path(target_dir, ctx=None):
         Path of the downloaded pretrained model.
     ctx : mx.context, optional
         Context of the model. Default None is equivalent to mx.cpu().
-    location : str, optional
-        The directory which contains downloaded pretrained models
 
     Examples
     --------
-    >>> model = mx.pretrained_model.load_path('~/.graphlab/mxnet_models/InceptionV3')
+    >>> model = mx.pretrained_model.load_path('~/.graphlab/mxnet_models/imagenet1k_inception_v3')
     """
 
     _LOGGER.debug('load from: %s' % (target_dir))
@@ -201,6 +199,7 @@ def load_path(target_dir, ctx=None):
         labels = _json.load(open(label_file))
         return ImageClassifier(model, labels, metadata)
     elif metadata['model_type'] == ModelTypeEnum.IMAGE_DETECTOR:
+        import utils.proposal
         param_file = [f for f in _os.listdir(target_dir) if f.endswith('.params')]
         if len(param_file) != 1:
             raise ValueError('Invalid model directory %s. Please remove the directory and redownload the model' % target_dir)
@@ -215,7 +214,9 @@ def load_path(target_dir, ctx=None):
         # Load the feedforward model
         model = _FeedForward.load(prefix, epoch, ctx)
         label_file = _os.path.join(target_dir, 'labels.json')
-        return ImageDetector(model, label_file, metadata)
+        _LOGGER.debug('label_file: %s' % label_file)
+        labels = _json.load(open(label_file))
+        return ImageDetector(model, labels, metadata)
     else:
         raise TypeError('Unexpected model type: %s', metadata['model_type'])
 
@@ -249,6 +250,10 @@ class ImageClassifier(object):
             self._label_name = metadata['label_name']
         else:
             self._label_name = 'softmax_label'
+        if 'data_name' in metadata:
+            self._data_name = metadata['data_name']
+        else:
+            self._data_name = 'data'
 
     @property
     def model(self):
@@ -318,18 +323,18 @@ class ImageClassifier(object):
                                        mean_g=self.mean_rgb[1],
                                        mean_b=self.mean_rgb[2],
                                        mean_nd=self.mean_nd,
-                                       data_name='data',
+                                       data_name=self._data_name,
                                        label_name=self._label_name,
                                        scale=self.rescale)
         return dataiter
 
-    def extract_features(self, *args, **kwargs):
+    def extract_feature(self, *args, **kwargs):
         """
-        Alias for :py:func:`~mxnet.pretrained_model.ImageClassifier.extract_feature` 
+        Alias for :py:func:`~mxnet.pretrained_model.ImageClassifier.extract_features`
         """
-        return self.extract_feature(*args, **kwargs)
+        return self.extract_features(*args, **kwargs)
 
-    def extract_feature(self, data, batch_size=50):
+    def extract_features(self, data, batch_size=50):
         """
         Extracts features from the second to last layer in the network.
 
@@ -338,15 +343,14 @@ class ImageClassifier(object):
         data : SFrame, SArray[Image] or Image
             SFrame with a single image typed column, an SArray of Images, or
             a single Image
-            Images must have the same size as the model's input shape.
        batch_size : int, optional
             batch size of the input to the internal model. Larger
             batch size makes the prediction faster but requires more memory.
 
         Returns
         -------
-        out : SFrame
-            An SFrame of 2 columns: row_id, feature
+        out : SArray
+            An SArray of feature
 
         Examples
         --------
@@ -365,9 +369,7 @@ class ImageClassifier(object):
         dataiter = self._make_dataiter(data, batch_size)
         features =  _extract_feature(self.model, dataiter)
 
-        ret = _gl.SFrame()
-        ret['feature'] = features
-        ret = ret.add_row_number(column_name='row_id')
+        ret = _gl.SArray(features)
         return ret
 
     def predict_topk(self, data, k=5, batch_size=50):
@@ -378,8 +380,7 @@ class ImageClassifier(object):
         ----------
         data : SFrame or SArray[Image]
             SFrame with a single image typed column, an SArray of Images.
-            or a single Image. 
-            Images must have the same size as the model's input shape.
+            or a single Image.
         k : int, optional
             Number of classes returned for each input
         batch_size : int, optional
@@ -425,7 +426,6 @@ class ImageClassifier(object):
 
         ret = _gl.SFrame()
         ret['row_id'] = row_ids
-        ret['label_id'] = top_idx.flatten()
         ret['label'] = top_labels
         ret['score'] = top_scores.flatten()
         ret['rank'] = ranks
@@ -455,16 +455,20 @@ class ImageDetector(object):
         # rcnn params
         for k, v in metadata.items():
             self.__setattr__("_" + k, v)
+        if "target_size" not in metadata:
+            self._target_size = 600
+        if "max_size" not in metadata:
+            self._max_size = 1000
 
         # new executor
         self._ctx = model.ctx[0] # only support single device for now
         self._sym = model.symbol
+        self._base_sym = model.symbol
         self._arg_params = {k : v.as_in_context(self._ctx) for k, v in model.arg_params.items()}
         self._aux_params = {k : v.as_in_context(self._ctx) for k, v in model.aux_params.items()}
         self._executor_with_feature = False
 
     def _init_executor(self, sym):
-        #self._arg_params["data"] = _ndarray.zeros(self._input_shape, self._ctx)
         self._executor = sym.bind(self._ctx, self._arg_params, args_grad=None,
                                   grad_req="null", aux_states=self._aux_params)
 
@@ -491,9 +495,8 @@ class ImageDetector(object):
         im_tensor, im_info = self._preprocess(gl_im)
         self._arg_params["im_info"][:] = im_info
         self._arg_params["data"] = _ndarray.array(im_tensor, ctx=self._ctx)
-        #self._executor = self._executor.reshape(data=im_tensor.shape, im_info=(1, 3))
         self._init_executor(self._sym)
-        self._executor.forward()
+        self._executor.forward(is_train=False)
         blobs = dict(zip(self._sym.list_outputs(), [x.asnumpy() for x in self._executor.outputs]))
         scores = blobs["cls_prob_output"]
         bbox_deltas = blobs["bbox_pred_output"]
@@ -509,7 +512,7 @@ class ImageDetector(object):
         return blobs
 
 
-    def _preprocess(self, gl_im, target_size=600, max_size=1000):
+    def _preprocess(self, gl_im):
         import PIL
         import numpy as np
         import StringIO as _StringIO
@@ -518,10 +521,10 @@ class ImageDetector(object):
         im_shape = im.size
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
-        im_scale = float(target_size) / float(im_size_min)
+        im_scale = float(self._target_size) / float(im_size_min)
         # prevent bigger axis from being more than max_size:
-        if np.round(im_scale * im_size_max) > max_size:
-            im_scale = float(max_size) / float(im_size_max)
+        if np.round(im_scale * im_size_max) > self._max_size:
+            im_scale = float(self._max_size) / float(im_size_max)
         im_hw = (int(im_shape[0] * im_scale), int(im_shape[1] * im_scale))
         im = im.resize(im_hw, PIL.Image.ANTIALIAS)
         # normalize
@@ -535,10 +538,15 @@ class ImageDetector(object):
         return im_tensor, im_info
 
 
-    def _postprocess(self, blobs, class_score_threshold=0.3, nms_threshold=0.3):
-        out_blob = {}
-        dets = []
-        feature = []
+    def _postprocess(self, blobs, class_score_threshold=0.5, nms_threshold=0.3):
+        try:
+            import graphlab as _gl
+        except ImportError:
+            import sframe as _gl
+        except ImportError:
+            raise ImportError('Require GraphLab Create or SFrame')
+
+        out_blob = {"class":[], "box":[], "score":[], "feature":[]}
         scores = blobs["cls_prob_output"]
         boxes = blobs["bbox_pred"]
         for j in range(1, self._num_classes):
@@ -548,17 +556,47 @@ class ImageDetector(object):
             cls_dets = _np.hstack((cls_boxes, cls_scores[:, _np.newaxis]))\
                     .astype(_np.float32, copy=False)
             keep = nms(cls_dets, nms_threshold)
-            cls_dets = cls_dets[keep, :]
-            dets.append(list(cls_dets))
+
+            # make result
+            out_blob["class"].extend([self._labels[j] for i in range(len(keep))])
+            out_blob["box"].extend(list(cls_boxes[keep, :]))
+            out_blob["score"].extend(cls_scores[keep])
             if self._executor_with_feature:
                 fea =  blobs["feature_output"][keep, :]
-                feature.append(list(fea))
-        out_blob["dets"] = dets
-        if self._executor_with_feature:
-            out_blob["feature"] = feature
-        return out_blob
+                out_blob["feature"].extend(list(fea))
+        if not self._executor_with_feature:
+            del out_blob["feature"]
+        return _gl.SFrame(out_blob)
 
-    def detect(self, data, filter_result=False, class_score_threshold=0.3, nms_threshold=0.3):
+    def _detect_array(self, arr, class_score_threshold=0.5, nms_threshold=0.3):
+        try:
+            import graphlab as _gl
+        except ImportError:
+            import sframe as _gl
+        except ImportError:
+            raise ImportError('Require GraphLab Create or SFrame')
+        ret = _gl.SFrame()
+        det_cnt = [0] * len(arr)
+        for i in range(len(arr)):
+            tmp = self._postprocess(self._detect(arr[i]), class_score_threshold, nms_threshold)
+            det_cnt[i] = len(tmp)
+            # if nothing detected:
+            if len(tmp) == 0:
+                if self._executor_with_feature:
+                    tmp = _gl.SFrame({"box":[[0.,0.,0.,0.]],
+                        "class":["nothing"], "score":[0.], "feature":[[0.]]})
+                else:
+                    tmp = _gl.SFrame({"box":[[0.,0.,0.,0.]], "class":["nothing"], "score":[0.]})
+                det_cnt[i] = 1
+            ret = ret.append(tmp)
+        image_id = []
+        for i in range(len(arr)):
+            image_id.extend([i] * det_cnt[i])
+        ret.add_column(_gl.SArray(image_id), "id")
+        return ret
+
+
+    def detect(self, data, class_score_threshold=0.5, nms_threshold=0.3):
         """
         Detect objects for the given data
 
@@ -567,10 +605,6 @@ class ImageDetector(object):
         data : SArray[Image] or gl.Image
             SArray of images type or a single gl.Imgae
             Image can be in various of size
-        filter_result: bool, optional
-            Filter raw detection result
-            If set to false, the returned result will box and score of 300 proposal for all objects
-            If set to true, the returned result will be filtered by nms and classification scroe
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
@@ -580,13 +614,8 @@ class ImageDetector(object):
 
         Returns
         -------
-        out: dict or SFrame
-            If input is gl.Image, out will be dict
-            If input is SArray[Image], out will be SFrame
-            If filter_result is False, keys will be [cls_prob_output, bbox_pred]
-            If filter_result is True, keys will be [dets]
-            dets format is detection result for each class.
-            The dection result is in 5 columns: 4 for box and last column is classification score
+        out: SFrame
+            SFrame with column: id, class, box, score, feature
         """
 
         try:
@@ -596,50 +625,19 @@ class ImageDetector(object):
         except ImportError:
             raise ImportError('Require GraphLab Create or SFrame')
         if type(data) == _gl.Image:
-            blobs = self._detect(data)
-            if filter_result:
-                return self._postprocess(blobs, class_score_threshold, nms_threshold)
-            else:
-                return blobs
+            return self._detect_array([data], class_score_threshold, nms_threshold)
         elif type(data) == _gl.SArray:
-            if filter_result:
-                tmp = collections.defaultdict(list)
-                for x in data:
-                    ret = self._postprocess(self._detect(x), class_score_threshold, nms_threshold)
-                    for key in ret.keys():
-                        tmp[key].append(ret[key])
-                return _gl.SFrame(tmp)
-            else:
-                tmp = collections.defaultdict(list)
-                for x in data:
-                    ret = self._detect(x)
-                    for key in ret.keys():
-                        tmp[key].append(ret[key])
-                return _gl.SFrame(tmp)
+            return self._detect_array(data, class_score_threshold, nms_threshold)
         elif type(data) == _gl.SFrame:
             if data.column_types().count(_gl.Image) != 1:
                 raise TypeError('Input SFrame must contain a single Image typed column')
             sa_data = data[data.column_names()[data.column_types().index(_gl.Image)]]
-            if filter_result:
-                tmp = collections.defaultdict(list)
-                for x in sa_data:
-                    ret = self._postprocess(self._detect(x), class_score_threshold, nms_threshold)
-                    for key in ret.keys():
-                        tmp[key].append(ret[key])
-                return _gl.SFrame(tmp)
-            else:
-                tmp = collections.defaultdict(list)
-                for x in sa_data:
-                    ret = self._detect(x)
-                    for key in ret.keys():
-                        tmp[key].append(ret[key])
-                return _gl.SFrame(tmp)
+            return self._detect_array(sa_data, class_score_threshold, nms_threshold)
         else:
             raise Exception("Unsupported input data type.")
 
     def extract_feature(self, data,
-                        filter_result=False,
-                        class_score_threshold=0.3,
+                        class_score_threshold=0.5,
                         nms_threshold=0.3,
                         feature_op="roi_pool5"):
         """
@@ -650,10 +648,6 @@ class ImageDetector(object):
         data : SArray[Image] or gl.Image
             SArray of images type of a single gl.Imgae
             Image can be in various of size
-        filter_result: bool, optional
-            Filter raw detection result
-            If set to false, the returned result will box and score of 300 proposal for all objects
-            If set to true, the returned result will be filtered by nms and classification scroe
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
@@ -666,14 +660,8 @@ class ImageDetector(object):
 
         Returns
         -------
-        out: dict or SFrame
-            If input is gl.Image, out will be dict
-            If input is SArray[Image], out will be SFrame
-            If filter_result is False, keys will be [cls_prob_output, bbox_pred, feature]
-            If filter_result is True, keys will be [dets, feature]
-            dets format is detection result for each class. feature is in same format of dets
-            The dection result is in 5 columns: 4 for box and last column is classification score
-            The feature is a vector
+        out: SFrame
+            SFrame with column: id, class, box, score, feature
         """
 
         if not self._executor_with_feature:
@@ -687,7 +675,10 @@ class ImageDetector(object):
             tmp.append(fea_flatten)
             self._sym = _sym.Group(tmp)
             self._executor_with_feature = True
-        return self.detect(data, filter_result, class_score_threshold, nms_threshold)
+        ret = self.detect(data, class_score_threshold, nms_threshold)
+        self._sym = self._base_sym
+        self._executor_with_feature = False
+        return ret
 
     def visualize_detection(self, gl_im, dets):
         """
@@ -697,8 +688,8 @@ class ImageDetector(object):
         ----------
         gl_im: gl.Image
             The image will be visalized
-        dets: list
-            Filtered detection result
+        dets: SFrame
+            detection result in sframe
 
         """
         import matplotlib.pyplot as plt
@@ -713,23 +704,20 @@ class ImageDetector(object):
 
         assert(type(gl_im) == _gl.Image)
         im = gl_im._to_pil_image()
-        for j in range(1, self._num_classes):
-            class_name = self.labels[j]
-            if len(dets[j - 1]) == 0:
-                continue
-            det = _np.vstack(dets[j - 1])
-            for i in range(_np.minimum(10, det.shape[0])):
-                bbox = det[i, :4]
-                score = det[i, -1]
-                plt.cla()
-                plt.imshow(im)
-                plt.gca().add_patch(
-                plt.Rectangle((bbox[0], bbox[1]),
-                            bbox[2] - bbox[0],
-                            bbox[3] - bbox[1], fill=False,
-                            edgecolor='r', linewidth=3)
-                )
-                plt.title('{}  {:.3f}'.format(class_name, score))
-                plt.show()
+        assert len(dets['id'].unique()) == 1, "only support visualize single image"
+        for i in range(len(dets)):
+            class_name = dets[i]["class"]
+            bbox = dets[i]["box"]
+            score = dets[i]["score"]
+
+            plt.cla()
+            plt.imshow(im)
+            plt.gca().add_patch(
+            plt.Rectangle((bbox[0], bbox[1]),
+                           bbox[2] - bbox[0],
+                           bbox[3] - bbox[1], fill=False,
+                           edgecolor='r', linewidth=3))
+            plt.title('{}  {:.3f}'.format(class_name, score))
+            plt.show()
 
 

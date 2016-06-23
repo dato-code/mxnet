@@ -42,11 +42,6 @@ struct NativeOpParam : public dmlc::Parameter<NativeOpParam> {
 
 template<typename xpu>
 class NativeOpBase : public Operator {
- public:
-  virtual ExecType exec_type() const {
-    return kAsync;
-  }
-
  protected:
   inline uint64_t _CalculateSpace(const std::vector<TBlob> &tblob_vec) {
     uint64_t size = 0;
