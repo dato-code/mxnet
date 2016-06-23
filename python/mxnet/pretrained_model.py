@@ -343,7 +343,7 @@ class ImageClassifier(object):
         ----------
         data : SFrame, SArray[Image] or Image
             SFrame with a single image typed column, an SArray of Images, or
-            a single Image
+            a single Image. The images can be of various sizes. 
        batch_size : int, optional
             batch size of the input to the internal model. Larger
             batch size makes the prediction faster but requires more memory.
@@ -381,7 +381,7 @@ class ImageClassifier(object):
         ----------
         data : SFrame or SArray[Image]
             SFrame with a single image typed column, an SArray of Images.
-            or a single Image.
+            or a single Image. The images can be of various sizes. 
         k : int, optional
             Number of classes returned for each input
         batch_size : int, optional
@@ -610,7 +610,7 @@ class ImageDetector(object):
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
         nms_threshold: float, optional
-            Threshold for filtering by nms(non-maximum surprised)
+            Threshold for filtering by nms(non-maximum suppression)
             If the nms score is below threshold, the result will be filtered out
 
         Returns
@@ -647,23 +647,23 @@ class ImageDetector(object):
     def extract_features(self, data,
                         class_score_threshold=0.5,
                         nms_threshold=0.3,
-                        feature_op="roi_pool5"):
+                        layer="roi_pool5"):
         """
         Detect objects and extract feature of objects for the given data
 
         Parameters
         ----------
         data : SFrame, SArray[Image] or gl.Image
-            SFrame, SArray of images type of a single gl.Imgae
+            SFrame, SArray of images type of a single gl.Image
             Image can be of various sizes. 
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
         nms_threshold: float, optional
-            Threshold for filtering by nms(non-maximum suppressed)
+            Threshold for filtering by nms(non-maximum suppression)
             If the nms score is below threshold, the result will be filtered out
-        feature_op: str, optional
-            Name of operator which generates object feature
+        layer: str, optional
+            Name of layer which generates object feature
 
 
         Returns
@@ -675,7 +675,7 @@ class ImageDetector(object):
         if not self._executor_with_feature:
             outputs = self._sym.list_outputs()
             internals = self._sym.get_internals()
-            roi_pool = internals["%s_output" % feature_op]
+            roi_pool = internals["%s_output" % layer]
             fea_pool = _sym.Pooling(name="roi_avg_pool", data=roi_pool,
                                       kernel=(7,7), stride=(1,1), pool_type="avg")
             fea_flatten = _sym.Flatten(name="feature", data=fea_pool)
@@ -695,7 +695,7 @@ class ImageDetector(object):
         Parameters
         ----------
         gl_im: gl.Image
-            The image will be visualized
+            The image to be visualized
         dets: SFrame
             detection result in sframe
 
