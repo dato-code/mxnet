@@ -602,8 +602,8 @@ class ImageDetector(object):
 
         Parameters
         ----------
-        data : SArray[Image] or gl.Image
-            SArray of images type or a single gl.Imgae
+        data : SFrame, SArray[Image] or gl.Image
+            SFrame, SArray of images type or a single gl.Imgae
             Image can be in various of size
         class_score_threshold: float, optional
             Threshold for filtering.
@@ -645,14 +645,14 @@ class ImageDetector(object):
 
         Parameters
         ----------
-        data : SArray[Image] or gl.Image
-            SArray of images type of a single gl.Imgae
+        data : SFrame, SArray[Image] or gl.Image
+            SFrame, SArray of images type of a single gl.Imgae
             Image can be in various of size
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
         nms_threshold: float, optional
-            Threshold for filtering by nms(non-maximum surprised)
+            Threshold for filtering by nms(non-maximum suppressed)
             If the nms score is below threshold, the result will be filtered out
         feature_op: str, optional
             Name of operator which generates object feature
@@ -687,7 +687,7 @@ class ImageDetector(object):
         Parameters
         ----------
         gl_im: gl.Image
-            The image will be visalized
+            The image will be visualized
         dets: SFrame
             detection result in sframe
 
