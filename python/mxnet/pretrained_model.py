@@ -604,8 +604,8 @@ class ImageDetector(object):
         Parameters
         ----------
         data : SFrame, SArray[Image] or gl.Image
-            SFrame, SArray of images type or a single gl.Imgae
-            Image can be in various of size
+            SFrame, SArray of images type or a single gl.Image
+            Image can be of various sizes.
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
@@ -655,7 +655,7 @@ class ImageDetector(object):
         ----------
         data : SFrame, SArray[Image] or gl.Image
             SFrame, SArray of images type of a single gl.Imgae
-            Image can be in various of size
+            Image can be of various sizes. 
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
