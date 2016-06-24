@@ -698,34 +698,49 @@ class ImageDetector(object):
             The image to be visualized
         dets: SFrame
             detection result in sframe
+        
+        Returns
+        -------
+        out: gl.Image
+            Image with bounding boxes drawn. 
 
         """
-        import matplotlib.pyplot as plt
-        import StringIO as _StringIO
-        import PIL
+        try:
+            from PIL import ImageDraw
+        except ImportError:
+            raise ImportError('PIL or pillow package is required for this')
+
         try:
             import graphlab as _gl
         except ImportError:
             import sframe as _gl
         except ImportError:
-            raise ImportError('Require GraphLab Create or SFrame')
+            raise ImportError('Requires GraphLab Create or SFrame')
 
         assert(type(gl_im) == _gl.Image)
-        im = gl_im._to_pil_image()
+        pil_img = gl_im._to_pil_image()
+        draw = ImageDraw(pil_img)
         assert len(dets['id'].unique()) == 1, "only support visualize single image"
-        for i in range(len(dets)):
-            class_name = dets[i]["class"]
-            bbox = dets[i]["box"]
-            score = dets[i]["score"]
+        for bbox in list(dets["box"]):
 
-            plt.cla()
-            plt.imshow(im)
-            plt.gca().add_patch(
-            plt.Rectangle((bbox[0], bbox[1]),
-                           bbox[2] - bbox[0],
-                           bbox[3] - bbox[1], fill=False,
-                           edgecolor='r', linewidth=3))
-            plt.title('{}  {:.3f}'.format(class_name, score))
-            plt.show()
+            draw.rectangle(list(bbox),outline="red")
+	
+	height = pil_img.size[1]
+	width = pil_img.size[0]
+	if pil_img.mode == 'L':
+	    image_data = bytearray([z for z in pil_img.getdata()])
+	    channels = 1
+	elif pil_img.mode == 'RGB':
+	    image_data = bytearray([z for l in pil_img.getdata() for z in l ])
+	    channels = 3
+	else:
+	    image_data = bytearray([z for l in pil_img.getdata() for z in l])
+	    channels = 4
+	format_enum = _format['RAW']
+	image_data_size = len(image_data)
+
+	# Construct a graphlab.Image
+
+    	return gl.Image(_image_data=image_data, _width=width, _height=height, _channels=channels, _format_enum=format_enum, _image_data_size=image_data_size)
 
 
