@@ -706,7 +706,7 @@ class ImageDetector(object):
 
         """
         try:
-            from PIL import ImageDraw
+            from PIL import ImageDraw,ImageFont
         except ImportError:
             raise ImportError('PIL or pillow package is required for this')
 
@@ -717,14 +717,25 @@ class ImageDetector(object):
         except ImportError:
             raise ImportError('Requires GraphLab Create or SFrame')
 
+        _format = {'JPG': 0, 'PNG': 1, 'RAW': 2, 'UNDEFINED': 3}
+
+
         assert(type(gl_im) == _gl.Image)
         pil_img = gl_im._to_pil_image()
-        draw = ImageDraw(pil_img)
+        draw = ImageDraw.Draw(pil_img)
+        fnt = ImageFont.truetype('Pillow/Tests/fonts/FreeMono.ttf', 12)
         assert len(dets['id'].unique()) == 1, "only support visualize single image"
-        for bbox in list(dets["box"]):
+
+        for row in dets:
+            bbox = row['box']
+            cls = str(row['class'])
+            score = str(row['score'])
 
             draw.rectangle(list(bbox),outline="red")
-	
+            draw.rectangle([bbox[0] + 1, bbox[1] + 1, bbox[2] - 1, bbox[3] - 1], outline="red")
+            draw.rectangle([bbox[0] + 2, bbox[1] + 2, bbox[2] - 2, bbox[3] - 2], outline="red")
+            draw.text((bbox[0] + 2, bbox[1] - 16),cls + ":" + score, font=fnt, fill="red")
+
 	height = pil_img.size[1]
 	width = pil_img.size[0]
 	if pil_img.mode == 'L':
@@ -741,6 +752,6 @@ class ImageDetector(object):
 
 	# Construct a graphlab.Image
 
-    	return gl.Image(_image_data=image_data, _width=width, _height=height, _channels=channels, _format_enum=format_enum, _image_data_size=image_data_size)
+    	return _gl.Image(_image_data=image_data, _width=width, _height=height, _channels=channels, _format_enum=format_enum, _image_data_size=image_data_size)
 
 
