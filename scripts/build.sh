@@ -111,7 +111,7 @@ TARGET_DIR=${WORKSPACE}/target
 archive_file_ext="tar.gz"
 cd ${TARGET_DIR}/build/python
 FNAME=${TARGET_DIR}/mxnet_${PLATFORM}_${BUILD_NUMBER}.${archive_file_ext}
-tar -czvf ${FNAME} mxnet/*.py mxnet/builtin_symbols mxnet/module libmxnet*
+tar -czvf ${FNAME} mxnet/*.py mxnet/builtin_symbols mxnet/utils mxnet/module libmxnet*
 echo "====================================="
 }
 
