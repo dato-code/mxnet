@@ -43,6 +43,16 @@ inline std::istream &operator>>(std::istream &is, ShapeInfo &shape) {
 
   int idx;
   std::vector<int> tmp;
+  // deal with empty case		
+  // safe to remove after stop using target_shape		
+  size_t pos = is.tellg();		
+  char ch = is.get();		
+  if (ch == ')') {		
+    shape.info = tmp;		
+    return is;		
+  }		
+  is.seekg(pos);		
+  // finish deal 
   while (is >> idx) {
     tmp.push_back(idx);
     char ch;

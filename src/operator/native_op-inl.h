@@ -186,7 +186,6 @@ class NativeOp : public NativeOpBase<xpu> {
     Parent::_SyncData(out_data, Parent::out_data_ptr_, s, nativeop::kDataToTensor);
     Parent::_SyncData(aux_args, Parent::aux_args_ptr_, s, nativeop::kDataToTensor);
     if (s != NULL) s->Wait();
-    ctx.async_on_complete();
   }
 
   virtual void Backward(const OpContext &ctx,
@@ -213,7 +212,6 @@ class NativeOp : public NativeOpBase<xpu> {
     Parent::_SyncData(in_grad, Parent::in_grad_ptr_, s, nativeop::kDataToTensor);
     Parent::_SyncData(aux_args, Parent::aux_args_ptr_, s, nativeop::kDataToTensor);
     if (s != NULL) s->Wait();
-    ctx.async_on_complete();
   }
 
  private:
