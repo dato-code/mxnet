@@ -736,22 +736,22 @@ class ImageDetector(object):
             draw.rectangle([bbox[0] + 2, bbox[1] + 2, bbox[2] - 2, bbox[3] - 2], outline="red")
             draw.text((bbox[0] + 2, bbox[1] - 16),cls + ":" + score, font=fnt, fill="red")
 
-	height = pil_img.size[1]
-	width = pil_img.size[0]
-	if pil_img.mode == 'L':
-	    image_data = bytearray([z for z in pil_img.getdata()])
-	    channels = 1
-	elif pil_img.mode == 'RGB':
-	    image_data = bytearray([z for l in pil_img.getdata() for z in l ])
-	    channels = 3
-	else:
-	    image_data = bytearray([z for l in pil_img.getdata() for z in l])
-	    channels = 4
-	format_enum = _format['RAW']
-	image_data_size = len(image_data)
+        height = pil_img.size[1]
+        width = pil_img.size[0]
+        if pil_img.mode == 'L':
+            image_data = bytearray([z for z in pil_img.getdata()])
+            channels = 1
+        elif pil_img.mode == 'RGB':
+            image_data = bytearray([z for l in pil_img.getdata() for z in l ])
+            channels = 3
+        else:
+            image_data = bytearray([z for l in pil_img.getdata() for z in l])
+            channels = 4
+        format_enum = _format['RAW']
+        image_data_size = len(image_data)
 
-	# Construct a graphlab.Image
+        # Construct a graphlab.Image
 
-    	return _gl.Image(_image_data=image_data, _width=width, _height=height, _channels=channels, _format_enum=format_enum, _image_data_size=image_data_size)
+        return _gl.Image(_image_data=image_data, _width=width, _height=height, _channels=channels, _format_enum=format_enum, _image_data_size=image_data_size)
 
 
