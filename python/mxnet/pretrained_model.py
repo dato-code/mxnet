@@ -516,7 +516,6 @@ class ImageDetector(object):
     def _preprocess(self, gl_im):
         import PIL
         import numpy as np
-        import StringIO as _StringIO
         # build PIL image from sframe
         im = gl_im._to_pil_image()
         im_shape = im.size
