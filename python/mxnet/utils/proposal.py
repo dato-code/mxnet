@@ -7,9 +7,9 @@ from .. import operator
 import numpy as np
 import numpy.random as npr
 
-from rcnn_utils import generate_anchors
-from rcnn_utils import bbox_pred, clip_boxes
-from rcnn_utils import nms
+from .rcnn_utils import generate_anchors
+from .rcnn_utils import bbox_pred, clip_boxes
+from .rcnn_utils import nms
 
 DEBUG = False
 
@@ -24,9 +24,9 @@ class ProposalOperator(operator.CustomOp):
         self._output_score = output_score
 
         if DEBUG:
-            print 'feat_stride: {}'.format(self._feat_stride)
-            print 'anchors:'
-            print self._anchors
+            print('feat_stride: {}'.format(self._feat_stride))
+            print('anchors:')
+            print(self._anchors)
 
     def forward(self, is_train, req, in_data, out_data, aux):
         # for each (H, W) location i
@@ -52,14 +52,14 @@ class ProposalOperator(operator.CustomOp):
         im_info = in_data[2].asnumpy()[0, :]
 
         if DEBUG:
-            print 'im_size: ({}, {})'.format(im_info[0], im_info[1])
-            print 'scale: {}'.format(im_info[2])
+            print('im_size: ({}, {})'.format(im_info[0], im_info[1]))
+            print('scale: {}'.format(im_info[2]))
 
         # 1. Generate proposals from bbox_deltas and shifted anchors
         height, width = scores.shape[-2:]
 
         if DEBUG:
-            print 'score map size: {}'.format(scores.shape)
+            print('score map size: {}'.format(scores.shape))
 
         # Enumerate all shifts
         shift_x = np.arange(0, width) * self._feat_stride

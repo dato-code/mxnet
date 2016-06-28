@@ -596,7 +596,7 @@ def register(reg_name):
         def creator(op_type, argc, keys, vals, ret):
             """internal function"""
             assert py_str(op_type) == reg_name
-            kwargs = dict([(keys[i], vals[i]) for i in range(argc)])
+            kwargs = dict([(py_str(keys[i]), vals[i]) for i in range(argc)])
             op_prop = prop_cls(**kwargs)
 
             def infer_shape_entry(num_tensor, tensor_dims,
