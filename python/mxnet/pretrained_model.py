@@ -8,6 +8,7 @@ from . import ndarray as _ndarray
 from . import io as _io
 from . import symbol as _sym
 from .utils.rcnn_utils import nms, bbox_transform_inv, clip_boxes
+from .utils import proposal
 import numpy as _np
 import requests
 import collections
@@ -200,7 +201,6 @@ def load_path(target_dir, ctx=None):
         labels = _json.load(open(label_file))
         return ImageClassifier(model, labels, metadata)
     elif metadata['model_type'] == ModelTypeEnum.IMAGE_DETECTOR:
-        import utils.proposal
         param_file = [f for f in _os.listdir(target_dir) if f.endswith('.params')]
         if len(param_file) != 1:
             raise ValueError('Invalid model directory %s. Please remove the directory and redownload the model' % target_dir)
@@ -343,7 +343,7 @@ class ImageClassifier(object):
         ----------
         data : SFrame, SArray[Image] or Image
             SFrame with a single image typed column, an SArray of Images, or
-            a single Image. The images can be of various sizes. 
+            a single Image. The images can be of various sizes.
        batch_size : int, optional
             batch size of the input to the internal model. Larger
             batch size makes the prediction faster but requires more memory.
@@ -381,7 +381,7 @@ class ImageClassifier(object):
         ----------
         data : SFrame or SArray[Image]
             SFrame with a single image typed column, an SArray of Images.
-            or a single Image. The images can be of various sizes. 
+            or a single Image. The images can be of various sizes.
         k : int, optional
             Number of classes returned for each input
         batch_size : int, optional
@@ -655,7 +655,7 @@ class ImageDetector(object):
         ----------
         data : SFrame, SArray[Image] or gl.Image
             SFrame, SArray of images type of a single gl.Image
-            Image can be of various sizes. 
+            Image can be of various sizes.
         class_score_threshold: float, optional
             Threshold for filtering.
             If the classification score is below threshold, the result will be filtered out
@@ -698,11 +698,11 @@ class ImageDetector(object):
             The image to be visualized
         dets: SFrame
             detection result in sframe
-        
+
         Returns
         -------
         out: gl.Image
-            Image with bounding boxes drawn. 
+            Image with bounding boxes drawn.
 
         """
         try:
