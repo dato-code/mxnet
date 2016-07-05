@@ -722,7 +722,7 @@ class ImageDetector(object):
         assert(type(gl_im) == _gl.Image)
         pil_img = gl_im._to_pil_image()
         draw = ImageDraw.Draw(pil_img)
-        fnt = ImageFont.truetype(_os.path.join(_os.path.dirname(__file__),'FreeMono.ttf'), 12)
+        fnt = ImageFont.truetype(_os.path.join(_os.path.dirname(__file__),'Lato-Regular.ttf'), 12)
         assert len(dets['id'].unique()) == 1, "only support visualize single image"
 
         for row in dets:

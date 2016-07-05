@@ -85,7 +85,7 @@ fi
 set -x
 cp -r python/mxnet ${TARGET_DIR}/python/
 cp -r lib/libmxnet.${dll_ext} ${TARGET_DIR}/python/${LIB_NAME}.${dll_ext}
-cp -r fonts/FreeMono.ttf ${TARGET_DIR}/python/mxnet/FreeMono.ttf 
+cp -r fonts/Lato-Regular.ttf ${TARGET_DIR}/python/mxnet/Lato-Regular.ttf 
 if [[ $OSTYPE == linux* ]]; then
   strip -s ${TARGET_DIR}/python/${LIB_NAME}.${dll_ext}
 fi
@@ -112,7 +112,7 @@ TARGET_DIR=${WORKSPACE}/target
 archive_file_ext="tar.gz"
 cd ${TARGET_DIR}/build/python
 FNAME=${TARGET_DIR}/mxnet_${PLATFORM}_${BUILD_NUMBER}.${archive_file_ext}
-tar -czvf ${FNAME} mxnet/*.py mxnet/builtin_symbols mxnet/utils mxnet/module libmxnet* mxnet/FreeMono.ttf
+tar -czvf ${FNAME} mxnet/*.py mxnet/builtin_symbols mxnet/utils mxnet/module libmxnet* mxnet/Lato-Regular.ttf
 echo "====================================="
 }
 
