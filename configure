@@ -6,11 +6,11 @@ PROJECT_HOME=$PWD
 DEPS_PREFIX=$PWD/deps/local
 
 if [[ $OSTYPE == linux* ]]; then
-        DEFAULT_DATO_DEPS_VERSION=8
+        DEFAULT_DATO_DEPS_VERSION=12
 elif [[ $OSTYPE == darwin* ]]; then
-        DEFAULT_DATO_DEPS_VERSION=8
+        DEFAULT_DATO_DEPS_VERSION=12
 elif [[ $OSTYPE == msys ]]; then
-        DEFAULT_DATO_DEPS_VERSION=8
+        DEFAULT_DATO_DEPS_VERSION=12
 fi
 
 ## Support code
