@@ -63,7 +63,7 @@ USE_NVRTC = 0
 USE_OPENCV = 0
 
 # use openmp for parallelization
-USE_OPENMP = ${USE_OPENMP}
+USE_OPENMP = 0
 ifneq ($(USE_OPENMP), 1)
 	export NO_OPENMP = 1
 	ADD_CFLAGS += -DDISABLE_OPENMP
